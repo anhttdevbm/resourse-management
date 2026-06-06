@@ -1,0 +1,137 @@
+$padding-horizontal-3: 1rem;
+$breakpoint-md: 768px;
+$spacing-unit: 1rem;
+$letter-spacing-tight: -0.05em;
+$font-weight-bold: 700;
+
+.text-center {
+    text-align: center;
+}
+
+.p-4 {
+    padding: 16px;
+}
+
+.hiden-overflow {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.text-md-start {
+    @media (min-width: $breakpoint-md) {
+        text-align: start;
+    }
+}
+
+.d-flex {
+    display: flex;
+}
+
+.d-flex {
+    display: flex;
+}
+
+.flex-row {
+    flex-direction: row;
+}
+
+.flex-column {
+    flex-direction: column;
+}
+
+.justify-content-start {
+    justify-content: flex-start;
+}
+
+.justify-content-center {
+    justify-content: center;
+}
+
+.justify-content-end {
+    justify-content: flex-end;
+}
+
+.justify-content-between {
+    justify-content: space-between;
+}
+
+.justify-content-around {
+    justify-content: space-around;
+}
+
+.justify-content-evenly {
+    justify-content: space-evenly;
+}
+
+.align-items-start {
+    align-items: flex-start;
+}
+
+.align-items-center {
+    align-items: center;
+}
+
+.align-items-end {
+    align-items: flex-end;
+}
+
+.align-items-baseline {
+    align-items: baseline;
+}
+
+.align-items-stretch {
+    align-items: stretch;
+}
+
+.align-content-start {
+    align-content: flex-start;
+}
+
+.align-content-center {
+    align-content: center;
+}
+
+.align-content-end {
+    align-content: flex-end;
+}
+
+.align-content-between {
+    align-content: space-between;
+}
+
+.align-content-around {
+    align-content: space-around;
+}
+
+.align-content-evenly {
+    align-content: space-evenly;
+}
+
+.my-5 {
+    margin-top: $spacing-unit * 5;
+    margin-bottom: $spacing-unit * 5;
+}
+
+$display-3-font-size: 3rem;
+
+// Display classes
+.display-3 {
+    font-size: $display-3-font-size;
+    font-weight: 300;
+    line-height: 1.2;
+}
+
+.fw-bold {
+    font-weight: $font-weight-bold;
+}
+
+.ls-tight {
+    letter-spacing: $letter-spacing-tight;
+}
+
+
+.px-3 {
+    padding-left: $padding-horizontal-3;
+    padding-right: $padding-horizontal-3;
+}

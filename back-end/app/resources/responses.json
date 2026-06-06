@@ -1,0 +1,252 @@
+{
+  "API_DETAIL": {
+    "timestamp": "2023-09-15 10:20:59",
+    "data": {
+      "created_at": "2023-09-15T03:11:02.171181",
+      "app_id": "ABC",
+      "client_session": "MacIntel_Chrome107000_345c39f63a5_1669265672",
+      "status": "Success",
+      "ocr_result": {
+        "card_type": "CHIP_ID",
+        "id": "0123456789102",
+        "id_prob": 1,
+        "fullname": "NGUYỄN VĂn A",
+        "fullname_prob": 1,
+        "birth": "13/05/2001",
+        "birth_prob": 1,
+        "sex": "Nam",
+        "sex_prob": 1,
+        "nationality": "Việt Nam",
+        "nationality_prob": 1,
+        "ethnic": null,
+        "ethnic_prob": null,
+        "religion": null,
+        "religion_prob": null,
+        "origin": "Thanh Hà, Hải Dương",
+        "origin_prob": 1,
+        "residence": "72 Hàm Tử Quan\nChương Dương, Hoàn Kiếm, Hà Nội",
+        "residence_prob": 0.9999899999999999,
+        "expiry": "13/05/2025",
+        "expiry_prob": 1,
+        "issue_date": "10/07/2021",
+        "issue_date_prob": 1,
+        "issue_place": null,
+        "issue_place_prob": null,
+        "features": "Sẹo chấm C: 1.5cm trên sau\nmép trái",
+        "features_prob": 0.99838,
+        "mrz": "IDVNM2000031451001200003145<<2\n0005131M2505130VNM<<<<<<<<<<<6\nNGUYEN<<CONG<TRI<<<<<<<<<<<<<<",
+        "mrz_prob": 1,
+        "citizen_id": null,
+        "citizen_id_prob": null,
+        "qr_code": "True",
+        "qr_code_prob": 0.9804806709289551,
+        "code": null,
+        "code_prob": null,
+        "symbol": null,
+        "symbol_prob": null,
+        "chips": null,
+        "chips_prob": null,
+        "stamp": null,
+        "stamp_prob": null,
+        "fingerprints": null,
+        "fingerprints_prob": null,
+        "class_license": null,
+        "class_license_prob": null,
+        "checking_result_front": {
+          "corner_cut_result": "0",
+          "corner_cut_probs": [
+            0.15227359533309937,
+            0.15661674737930298,
+            0.18393290042877197,
+            0.16608518362045288
+          ],
+          "check_photocopied_prob": null,
+          "check_photocopied_result": null,
+          "edited_result": null,
+          "edited_prob": null,
+          "recaptured_result": null,
+          "recaptured_prob": null,
+          "cover": null,
+          "cover_prob": null
+        },
+        "quality_front": {
+          "luminance_measure": {
+            "luminance_score": 0.6463159248329087,
+            "dark": false,
+            "bright": false
+          },
+          "blur_measure": {
+            "blur_score": 18.42510979422781,
+            "blurry": false,
+            "too_blurry": false
+          },
+          "glare_measure": {
+            "glare": false,
+            "glare_threshold": null,
+            "glare_fields": null
+          },
+          "final_result": {
+            "bright": false,
+            "dark": false,
+            "blurred": false,
+            "glared": false,
+            "summary": false
+          }
+        },
+        "checking_result_back": {
+          "corner_cut_result": "1",
+          "corner_cut_probs": [
+            0.2220417857170105,
+            0.23692893981933594,
+            0.3042328953742981,
+            0.18938767910003662
+          ],
+          "check_photocopied_prob": null,
+          "check_photocopied_result": null,
+          "edited_result": null,
+          "edited_prob": null,
+          "recaptured_result": null,
+          "recaptured_prob": null,
+          "cover": null,
+          "cover_prob": null
+        },
+        "quality_back": {
+          "luminance_measure": {
+            "luminance_score": 0.7037230550906647,
+            "dark": false,
+            "bright": false
+          },
+          "blur_measure": {
+            "blur_score": 27.949825334674017,
+            "blurry": false,
+            "too_blurry": false
+          },
+          "glare_measure": {
+            "glare": false,
+            "glare_threshold": null,
+            "glare_fields": null
+          },
+          "final_result": {
+            "bright": false,
+            "dark": false,
+            "blurred": false,
+            "glared": false,
+            "summary": false
+          }
+        },
+        "back_expire_warning": null,
+        "postcode": [
+          {
+            "type": "residence",
+            "province": {
+              "01": "Thành phố Hà Nội"
+            },
+            "district": {
+              "002": "Quận Hoàn Kiếm"
+            },
+            "ward": {
+              "00067": "Phường Chương Dương"
+            }
+          },
+          {
+            "type": "origin",
+            "province": {
+              "30": "Tỉnh Hải Dương"
+            },
+            "district": {
+              "294": "Huyện Thanh Hà"
+            },
+            "ward": null
+          }
+        ],
+        "tampering": {
+          "is_legal": true,
+          "mrz": {
+            "valid_mrz": true,
+            "match_sex": true,
+            "match_bod": true,
+            "match_id": true,
+            "match_valid_date": true,
+            "match_name": true,
+            "match_nationality": true
+          },
+          "card_id": {
+            "valid_id": true,
+            "match_sex": true,
+            "match_birth_year": true,
+            "match_residence": true
+          },
+          "expiry": "OK"
+        },
+        "created_at": "2023-09-15T10:10:51"
+      },
+      "ocr_status": "Success",
+      "liveness_result": {
+        "code": "Success",
+        "message": "Live Face",
+        "is_eye_open": "Yes",
+        "multiple_faces": true,
+        "face_masked": false,
+        "face_swapping": false,
+        "fake_print_photo": false,
+        "bright": false,
+        "dark": false,
+        "blurred": false,
+        "glared": false,
+        "created_at": "2023-09-15T10:10:51"
+      },
+      "liveness_status": "Success",
+      "compare_result": {
+        "created_at": "2023-09-15T10:10:51",
+        "code": "Success",
+        "message": "Faces Match Probability: 72.0439076423645%",
+        "match_warning": "No",
+        "prob": 0.720439076423645,
+        "multiple_faces": true
+      },
+      "compare_status": "Success",
+      "image_card_front": "",
+      "image_card_back": "",
+      "image_face_near": "",
+      "image_face_far": ""
+    },
+    "message": "success",
+    "code": "BE0000",
+    "links": null,
+    "relationships": null
+  },
+  "API_LOGIN_USER": {
+    "timestamp": "2023-09-15 10:00:36",
+    "data": {
+      "access_token": "token",
+      "refresh_token": "token"
+    },
+    "message": "success",
+    "code": "AUTH0000",
+    "links": null,
+    "relationships": null
+  },
+  "API_CREAT_APP": {
+    "timestamp": "2023-09-15 10:03:14",
+    "data": {
+      "app_name": "app_name",
+      "token_id": "token_id",
+      "app_key": "token_key"
+    },
+    "message": "success",
+    "code": "BE0000",
+    "links": null,
+    "relationships": null
+  },
+  "API_LOGIN_APP": {
+    "timestamp": "2023-09-15 10:06:21",
+    "data": {
+      "access_token": "token",
+      "refresh_token": "token"
+    },
+    "message": "success",
+    "code": "AUTH0000",
+    "links": null,
+    "relationships": null
+  }
+}

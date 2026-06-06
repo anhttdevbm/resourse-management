@@ -1,0 +1,52 @@
+body{
+    background: rgba(240,241,247,1) !important;
+    button{
+        outline: none !important;
+    }
+}
+.main-content{
+    margin-left: 240px;
+    margin-block-start: 3.5rem;
+    height: calc(100vh - 50px);
+    transition: margin-left 0.3s ease-in-out;
+    .container{
+        padding: 0 15px;
+    }
+    &.sidebar-open {
+        margin-left: 240px;
+        .page-heading-content {
+            padding-left: 1.5rem; // px-6
+            padding-right: 1.5rem;
+        }
+    }
+    &.sidebar-closed {
+        margin-left: 0;
+        .page-heading-content {
+            padding-left: 0 !important; // Sát lề trái
+            padding-right: 1.5rem !important;
+            margin-left: 0 !important;
+        }
+        .page_heading {
+            padding-left: 0 !important;
+            margin-left: 0 !important;
+        }
+    }
+}
+.page-heading-content {
+    transition: padding-left 0.3s ease-in-out;
+}
+.app-header{
+    // Header padding is now handled by Tailwind classes in the component
+    // This keeps the old styles for backward compatibility
+    .header-right-content{
+        .header-link{
+            padding: 1rem 0.65rem;
+            .header-link-icon{
+                width: 17px;
+                height: 17px;
+                font-size: 20px;
+                color: #536485;
+            }
+        }
+    }
+}
