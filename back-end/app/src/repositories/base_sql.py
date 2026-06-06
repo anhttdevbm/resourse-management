@@ -16,6 +16,7 @@ CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
 UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 
 
+
 class BaseSQLRepository(Generic[ModelType]):
     """Define BaseSQL repository object."""
 
