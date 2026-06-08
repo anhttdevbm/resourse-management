@@ -53,12 +53,15 @@ services:
     depends_on:
       - db
       - minio
+    env_file:
+      - ../../.env
+    volumes:
+      - ../../.env:/app/.env:ro
     environment:
-      - DATABASE_URL=postgresql://admin:123456@db:5432/resource_db
-      - AWS_HOST=http://minio:9000
-      - AWS_ACCESS_KEY_ID=minioadmin
-      - AWS_SECRET_ACCESS_KEY=minioadmin
-      - AWS_BUCKET=resource-management
+      ENV_FILE: /app/.env
+      # Hostnames inside Docker network (override local IP in .env)
+      HOST_DB: db
+      AWS_HOST: http://minio:9000
     restart: unless-stopped
 
   adminer:

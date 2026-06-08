@@ -1,7 +1,7 @@
 """Define user service file."""
 import uuid
 from uuid import uuid4
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
@@ -38,7 +38,7 @@ class UserService(object):
             models.BlacklistToken,
         )
 
-    def _user_with_permissions(self, db_session: Session, user_id: uuid.UUID) -> models.User | None:
+    def _user_with_permissions(self, db_session: Session, user_id: uuid.UUID) -> Optional[models.User]:
         from sqlalchemy.orm import joinedload
         return (
             db_session.query(models.User)
@@ -110,7 +110,7 @@ class UserService(object):
             raise AuthErrorCode.USERNAME_NOT_FOUND.value
         return self._serialize_user_admin(target)
 
-    def create_user(self, db_session: Session, user_create: UserCreate, actor: models.User | None = None) -> models.User:
+    def create_user(self, db_session: Session, user_create: UserCreate, actor: Optional[models.User] = None) -> models.User:
         """Define create user method."""
         if actor is not None and not self._has_admin_access(db_session, actor):
             raise BEErrorCode.USER_NOT_PERMISSION.value

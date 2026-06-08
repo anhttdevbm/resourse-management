@@ -3,7 +3,7 @@ import logging
 import os
 import tempfile
 import uuid
-from typing import List, Union
+from typing import List, Optional, Union
 
 from fastapi import UploadFile
 from fastapi.security import HTTPBearer
@@ -145,7 +145,7 @@ class ResourceService:
         stored = self.base_service.engine_postgresql.get_single_data(models.Resource, resource_id)
         file_url = stored.url  # ví dụ: "/uploads/images/1.0.0_file.png" hoặc "/images/..."
 
-        content: bytes | None = None
+        content: Optional[bytes] = None
 
         # Thử đọc từ local nếu url trỏ vào thư mục uploads
         if file_url.startswith("/uploads/"):

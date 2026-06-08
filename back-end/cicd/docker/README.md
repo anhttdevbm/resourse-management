@@ -39,10 +39,23 @@ docker-compose up --build -d
 
 ### Environment Configuration
 
-Copy `.env.sample` to `.env` and update values:
+Sửa file **`back-end/.env`** — Docker đọc file này khi **restart**, **không cần build lại**:
 
 ```bash
-cp cicd/config/.env.sample .env
+# Tạo lần đầu (nếu chưa có)
+cp back-end/cicd/config/.env.sample back-end/.env
+```
+
+Trong Docker, các biến sau được override tự động trong `docker-compose.yml`:
+- `HOST_DB=db` (tên service PostgreSQL)
+- `AWS_HOST=http://minio:9000`
+
+Sau khi sửa `.env`:
+
+```bash
+docker compose restart api
+# hoặc
+docker compose up -d api
 ```
 
 ### Useful Commands

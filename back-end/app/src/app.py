@@ -1,4 +1,13 @@
 """Define app."""
+import sys
+from pathlib import Path
+
+_root = str(Path(__file__).resolve().parents[2])
+if _root not in sys.path:
+    sys.path.insert(0, _root)
+
+from app import bootstrap_env  # noqa: F401 — load .env before other imports
+
 from fastapi.openapi.utils import get_openapi
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware

@@ -42,13 +42,20 @@ FROM setup_env as server_run
 # Copy app source code
 COPY app/ ./app/
 COPY migration/ ./migration/
-COPY cicd/config/.env.sample ./.env
 
+# .env is mounted at runtime via docker-compose (back-end/.env -> /app/.env)
 # Create start script with proper line endings
 RUN echo '#!/bin/sh' > start.sh && \
+    echo 'set -e' >> start.sh && \
+    echo 'ENV_PATH="${ENV_FILE:-/app/.env}"' >> start.sh && \
+    echo 'if [ ! -f "$ENV_PATH" ]; then' >> start.sh && \
+    echo '  echo "Missing $ENV_PATH — copy back-end/.env or cicd/config/.env.sample"' >> start.sh && \
+    echo '  exit 1' >> start.sh && \
+    echo 'fi' >> start.sh && \
     echo 'cd migration && alembic upgrade head' >> start.sh && \
-    echo 'cd ../app' >> start.sh && \
-    echo 'python3 main.py ../.env' >> start.sh && \
+    echo 'export PYTHONPATH=/app' >> start.sh && \
+    echo 'cd /app/app' >> start.sh && \
+    echo 'python3 main.py' >> start.sh && \
     chmod +x start.sh
 
 EXPOSE 30111
