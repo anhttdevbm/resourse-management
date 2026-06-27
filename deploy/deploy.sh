@@ -72,7 +72,11 @@ log "Building images..."
 ${COMPOSE} --env-file product.env build --pull
 
 log "Starting services..."
-${COMPOSE} --env-file product.env up -d
+if ! ${COMPOSE} --env-file product.env up -d; then
+  err "Compose up failed. API logs:"
+  ${COMPOSE} --env-file product.env logs --tail=100 api || true
+  exit 1
+fi
 
 log "Waiting for API health..."
 TRIES=0

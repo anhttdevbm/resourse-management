@@ -3,6 +3,8 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from decouple import config
 import logging
 
+from app.core.db_url import build_database_url
+
 logger = logging.getLogger(__name__)
 
 # Lấy cấu hình database từ environment variables
@@ -12,9 +14,8 @@ try:
     DB_PASS = config("PASSWORD_DB")
     DB_HOST = config("HOST_DB")
     DB_PORT = config("PORT_DB", cast=int)
-    
-    # Ghép chuỗi kết nối PostgreSQL
-    DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+    DATABASE_URL = build_database_url()
     
     logger.info(f"Connecting to database at {DB_HOST}:{DB_PORT}/{DB_NAME}")
     

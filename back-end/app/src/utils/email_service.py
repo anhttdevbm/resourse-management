@@ -11,8 +11,8 @@ class EmailService:
     def __init__(self):
         self.smtp_host = config('MAIL_HOST', default='smtp.gmail.com')
         self.smtp_port = config('MAIL_PORT', default=587, cast=int)
-        self.smtp_username = config('MAIL_USERNAME')
-        self.smtp_password = config('MAIL_PASSWORD')
+        self.smtp_username = config('MAIL_USERNAME', default=config('EMAIL_USER', default='noop@localhost'))
+        self.smtp_password = config('MAIL_PASSWORD', default=config('EMAIL_PASSWORD', default='noop'))
         self.frontend_url = config('FRONTEND_URL', default='http://localhost:5173')
         self.secret_key = config('SECRET_KEY', default='your-secret-key')
 

@@ -1,15 +1,12 @@
 """Define SQL connection."""
 from typing import Generator
 
-import decouple
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-engine = create_engine(
-    f"postgresql://{decouple.config('USERNAME_DB')}:{decouple.config('PASSWORD_DB')}@"
-    f"{decouple.config('HOST_DB')}/{decouple.config('NAME_DB')}",
-    pool_pre_ping=True,
-)
+from app.core.db_url import build_database_url
+
+engine = create_engine(build_database_url(), pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

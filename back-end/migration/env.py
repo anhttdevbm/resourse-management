@@ -34,10 +34,22 @@ target_metadata = None
 
 
 def get_url():
-    print(f"postgresql://{decouple.config('USERNAME_DB')}:{decouple.config('PASSWORD_DB')}@"
-          f"{decouple.config('HOST_DB')}:{decouple.config('PORT_DB')}/{decouple.config('NAME_DB')}")
-    return f"postgresql://{decouple.config('USERNAME_DB')}:{decouple.config('PASSWORD_DB')}@" \
-           f"{decouple.config('HOST_DB')}:{decouple.config('PORT_DB')}/{decouple.config('NAME_DB')}"
+    import sys
+    from pathlib import Path
+
+    _root = str(Path(__file__).resolve().parent.parent)
+    if _root not in sys.path:
+        sys.path.insert(0, _root)
+
+    from app.core.db_url import build_database_url
+
+    url = build_database_url()
+    print(
+        f"postgresql://{decouple.config('USERNAME_DB')}:****@"
+        f"{decouple.config('HOST_DB')}:{decouple.config('PORT_DB')}/"
+        f"{decouple.config('NAME_DB')}"
+    )
+    return url
 
 
 def run_migrations_offline():
