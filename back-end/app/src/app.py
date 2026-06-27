@@ -8,6 +8,7 @@ if _root not in sys.path:
 
 from app import bootstrap_env  # noqa: F401 — load .env before other imports
 
+import decouple
 from fastapi.openapi.utils import get_openapi
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
@@ -33,7 +34,11 @@ app.add_middleware(
     SessionMiddleware,
     secret_key="truongtuananh1212004@123",  
 )
-ALLOWED_ORIGINS = ["http://localhost:5173"]
+ALLOWED_ORIGINS = [
+    o.strip()
+    for o in decouple.config("CORS_ORIGINS", default="http://localhost:5173").split(",")
+    if o.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,

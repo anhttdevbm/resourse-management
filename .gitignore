@@ -52,6 +52,7 @@ dist-ssr/
 .env.*
 !.env.sample
 !.env.example
+deploy/product.env
 
 # --- Logs ---
 logs/

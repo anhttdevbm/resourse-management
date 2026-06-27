@@ -1,0 +1,25 @@
+# Backend API — build context: repository root
+FROM python:3.11-slim-bookworm
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY back-end/cicd/requirements/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
+
+COPY back-end/app/ ./app/
+COPY back-end/migration/ ./migration/
+COPY back-end/scripts/ ./scripts/
+COPY deploy/docker/start-api.sh /app/start-api.sh
+
+RUN mkdir -p /app/uploads && chmod +x /app/start-api.sh
+
+ENV PYTHONPATH=/app
+ENV ENV_FILE=/app/.env
+
+EXPOSE 30111
+
+CMD ["/app/start-api.sh"]

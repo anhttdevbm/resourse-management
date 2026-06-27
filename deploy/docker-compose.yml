@@ -1,0 +1,132 @@
+# =============================================================================
+# RMS Production — Docker Compose
+# Usage: ./deploy/deploy.sh   (from repo root)
+# =============================================================================
+
+name: ${COMPOSE_PROJECT_NAME:-rms}
+
+networks:
+  rms-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  minio_data:
+  api_uploads:
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: rms-db
+    restart: unless-stopped
+    env_file:
+      - product.env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_HOST_PORT:-1072}:5432"
+    networks:
+      - rms-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  minio:
+    image: minio/minio:latest
+    container_name: rms-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    env_file:
+      - product.env
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "${MINIO_HOST_PORT:-1073}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-1074}:9001"
+    networks:
+      - rms-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: rms-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    env_file:
+      - product.env
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} &&
+      mc mb local/$${AWS_BUCKET_NAME} --ignore-existing &&
+      mc anonymous set download local/$${AWS_BUCKET_NAME} 2>/dev/null || true &&
+      echo 'MinIO bucket ready'
+      "
+    networks:
+      - rms-net
+    restart: "no"
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.api
+    image: rms-api:latest
+    container_name: rms-api
+    restart: unless-stopped
+    env_file:
+      - product.env
+    environment:
+      ENV_FILE: /app/.env
+      HOST_DB: db
+      AWS_HOST: http://minio:9000
+    volumes:
+      - ./product.env:/app/.env:ro
+      - api_uploads:/app/uploads
+    ports:
+      - "${API_HOST_PORT:-1071}:${PORT:-30111}"
+    networks:
+      - rms-net
+    depends_on:
+      db:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:30111/docs || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 60s
+
+  nginx:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.nginx
+      args:
+        VITE_API_URL: ${VITE_API_URL:-}
+    image: rms-nginx:latest
+    container_name: rms-nginx
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-1070}:80"
+    networks:
+      - rms-net
+    depends_on:
+      api:
+        condition: service_healthy
