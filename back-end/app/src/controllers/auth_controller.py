@@ -95,7 +95,22 @@ def logout_system(
     return ResponseObject(message="Logout Success", code="AUTH0000")
 
 @auth_routers.get("/facebook/callback")
-async def facebook_callback(code: str, request: Request):
+async def facebook_callback(request: Request):
+    error = request.query_params.get("error") or request.query_params.get("error_message")
+    if error:
+        msg = request.query_params.get("error_message", error).replace(" ", "%20")
+        return RedirectResponse(
+            url=f"{_public_url()}/login?error=facebook_login_failed&message={msg}",
+            status_code=302,
+        )
+
+    code = request.query_params.get("code")
+    if not code:
+        return RedirectResponse(
+            url=f"{_public_url()}/login?error=facebook_login_failed&message=missing_code",
+            status_code=302,
+        )
+
     access_token = await get_facebook_access_token(code)
     fb_user = await get_facebook_user_info(access_token)
 
