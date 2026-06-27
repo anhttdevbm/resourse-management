@@ -57,9 +57,11 @@ if [[ "${BOOTSTRAP_ADMIN_PASSWORD:-}" == "ChangeMe@RMS2026!" ]]; then
   warn "Đang dùng mật khẩu mặc định BOOTSTRAP_ADMIN_PASSWORD — hãy đổi trong product.env trước khi deploy production!"
 fi
 
-if [[ "${SECRET_KEY:-}" == *"change"* ]] || [[ "${#SECRET_KEY:-}" -lt 24 ]]; then
+_secret_key="${SECRET_KEY:-}"
+if [[ "${_secret_key}" == *"change"* ]] || [[ ${#_secret_key} -lt 24 ]]; then
   warn "SECRET_KEY yếu hoặc mặc định — hãy đổi trong product.env!"
 fi
+unset _secret_key
 
 log "Project: ${COMPOSE_PROJECT_NAME:-rms}"
 log "Public URL: ${PUBLIC_URL:-http://localhost}"
