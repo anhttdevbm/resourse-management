@@ -38,6 +38,18 @@ auth_service = AuthService()
 auth_routers = APIRouter()
 email_service = EmailService()
 
+
+def _public_url() -> str:
+    return config("PUBLIC_URL", default="http://localhost:5173").rstrip("/")
+
+
+def _oauth_redirect_target(request: Request) -> str:
+    referer = request.headers.get("referer", "")
+    if "forgot-password" in referer:
+        return f"{_public_url()}/forgot-password"
+    return f"{_public_url()}/login"
+
+
 class PasswordResetRequest(BaseModel):
     email: EmailStr
 
@@ -91,14 +103,8 @@ async def facebook_callback(code: str, request: Request):
     user = await user_repository.get_or_create_user_by_facebook(fb_user, db)
 
     token_data = auth_service.login(user.email)
-    
-    # Get referer to determine redirect page
-    referer = request.headers.get("referer", "")
-    if "forgot-password" in referer:
-        frontend_url = "http://localhost:5173/forgot-password"
-    else:
-        frontend_url = "http://localhost:5173/login"
-    
+
+    frontend_url = _oauth_redirect_target(request)
     redirect_url = f"{frontend_url}?access_token={token_data['access_token']}&refresh_token={token_data.get('refresh_token', '')}&login_type=facebook"
     return RedirectResponse(url=redirect_url)
 
@@ -159,14 +165,8 @@ async def twitter_callback(request: Request):
 
         # Generate JWT tokens
         token_data = auth_service.login(user.email)
-        
-        # Get referer to determine redirect page
-        referer = request.headers.get("referer", "")
-        if "forgot-password" in referer:
-            frontend_url = "http://localhost:5173/forgot-password"
-        else:
-            frontend_url = "http://localhost:5173/login"
-        
+
+        frontend_url = _oauth_redirect_target(request)
         redirect_url = f"{frontend_url}?access_token={token_data['access_token']}&refresh_token={token_data.get('refresh_token', '')}&login_type=twitter"
         print(f"Redirecting to: {redirect_url}")
         
@@ -178,7 +178,7 @@ async def twitter_callback(request: Request):
         traceback.print_exc()
         
         # Redirect to frontend with error
-        frontend_url = "http://localhost:5173/login"
+        frontend_url = f"{_public_url()}/login"
         error_message = str(e).replace(' ', '%20')  # URL encode spaces
         redirect_url = f"{frontend_url}?error=twitter_login_failed&message={error_message}"
         return RedirectResponse(url=redirect_url, status_code=302)
@@ -212,19 +212,12 @@ async def google_callback(request: Request):
         user = await user_repository.get_or_create_user_by_google(google_user, db)
 
         token_data = auth_service.login(user.email)
-        
-        # Get referer to determine redirect page
-        referer = request.headers.get("referer", "")
-        if "forgot-password" in referer:
-            frontend_url = "http://localhost:5173/forgot-password"
-        else:
-            frontend_url = "http://localhost:5173/login"
-        
+
+        frontend_url = _oauth_redirect_target(request)
         redirect_url = f"{frontend_url}?access_token={token_data['access_token']}&refresh_token={token_data.get('refresh_token', '')}&login_type=google"
         return RedirectResponse(url=redirect_url)
     except Exception as e:
-        # Redirect to frontend with error
-        frontend_url = "http://localhost:5173/login"
+        frontend_url = f"{_public_url()}/login"
         redirect_url = f"{frontend_url}?error=google_login_failed&message={str(e)}"
         return RedirectResponse(url=redirect_url)
 
@@ -259,14 +252,8 @@ async def github_callback(request: Request, db: Session = Depends(get_db)):
 
         # Generate JWT tokens
         token_data = auth_service.login(user.email)
-        
-        # Get referer to determine redirect page
-        referer = request.headers.get("referer", "")
-        if "forgot-password" in referer:
-            frontend_url = "http://localhost:5173/forgot-password"
-        else:
-            frontend_url = "http://localhost:5173/login"
-        
+
+        frontend_url = _oauth_redirect_target(request)
         redirect_url = f"{frontend_url}?access_token={token_data['access_token']}&refresh_token={token_data.get('refresh_token', '')}&login_type=github"
         print(f"Redirecting to: {redirect_url}")
         
@@ -278,7 +265,7 @@ async def github_callback(request: Request, db: Session = Depends(get_db)):
         traceback.print_exc()
         
         # Redirect to frontend with error
-        frontend_url = "http://localhost:5173/login"
+        frontend_url = f"{_public_url()}/login"
         error_message = str(e).replace(' ', '%20')  # URL encode spaces
         redirect_url = f"{frontend_url}?error=github_login_failed&message={error_message}"
         return RedirectResponse(url=redirect_url, status_code=302)
@@ -307,7 +294,7 @@ async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(
 
         # Tạm thời bypass email service và log reset link
         print("=== FORGOT PASSWORD RESET LINK ===")
-        reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
+        reset_link = f"{config('FRONTEND_RESET_URL', default=f'{_public_url()}/reset-password')}?token={reset_token}"
         print(f"Reset link for {request.email}: {reset_link}")
         print("=== END RESET LINK ===")
         

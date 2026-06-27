@@ -12,6 +12,18 @@ const resolveBaseUrl = (): string => {
     return 'http://localhost:30111/';
 };
 
+/** Origin for full-page redirects (OAuth) — no trailing slash */
+export const getApiOrigin = (): string => {
+    const fromEnv = import.meta.env.VITE_API_URL;
+    if (fromEnv !== undefined && fromEnv !== '') {
+        return fromEnv.replace(/\/$/, '');
+    }
+    if (typeof window !== 'undefined' && window.location?.origin) {
+        return window.location.origin;
+    }
+    return 'http://localhost:30111';
+};
+
 export const baseURL = resolveBaseUrl();
 
 axios.defaults.baseURL = encodeURI(baseURL);

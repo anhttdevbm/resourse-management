@@ -1,4 +1,4 @@
-import axiosInstance from "../configs/axios";
+import axiosInstance, { getApiOrigin } from "../configs/axios";
 import { handleAxiosError } from "../helpers/axiosHelper";
 import { User } from "../types/User";
 import { cookieStorage } from "../utils/cookie";
@@ -35,9 +35,7 @@ const login = async (payload: LOGINPAYLOAD): Promise<User | null> => {
 
 const facebookLogin = async (): Promise<void> => {
     try {
-        // Redirect to backend Facebook login endpoint
-        const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:30111';
-        window.location.href = `${baseURL}/api/auth/login/facebook`;
+        window.location.href = `${getApiOrigin()}/api/auth/login/facebook`;
     } catch (error) {
         console.error('Facebook login error:', error);
         throw error;
@@ -46,9 +44,7 @@ const facebookLogin = async (): Promise<void> => {
 
 const twitterLogin = async (): Promise<void> => {
     try {
-        // Redirect to backend Twitter login endpoint
-        const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:30111';
-        window.location.href = `${baseURL}/api/auth/login/twitter`;
+        window.location.href = `${getApiOrigin()}/api/auth/login/twitter`;
     } catch (error) {
         console.error('Twitter login error:', error);
         throw error;
@@ -57,9 +53,7 @@ const twitterLogin = async (): Promise<void> => {
 
 const googleLogin = async (): Promise<void> => {
     try {
-        // Redirect to backend Google login endpoint
-        const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:30111';
-        window.location.href = `${baseURL}/api/auth/login/google`;
+        window.location.href = `${getApiOrigin()}/api/auth/login/google`;
     } catch (error) {
         console.error('Google login error:', error);
         throw error;
@@ -68,9 +62,7 @@ const googleLogin = async (): Promise<void> => {
 
 const githubLogin = async (): Promise<void> => {
     try {
-        // Redirect to backend GitHub login endpoint
-        const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:30111';
-        window.location.href = `${baseURL}/api/auth/login/github`;
+        window.location.href = `${getApiOrigin()}/api/auth/login/github`;
     } catch (error) {
         console.error('GitHub login error:', error);
         throw error;
@@ -108,7 +100,7 @@ const handleTwitterCallback = async (code: string, codeVerifier?: string): Promi
         }
         
         // This will redirect to frontend with tokens, so we don't need to handle response here
-        window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:30111'}${url}`;
+        window.location.href = `${getApiOrigin()}${url}`;
         return null;
     } catch (error) {
         console.error('Twitter callback error:', error);
@@ -119,9 +111,8 @@ const handleTwitterCallback = async (code: string, codeVerifier?: string): Promi
 const handleGoogleCallback = async (code: string): Promise<User | null> => {
     try {
         const url = `/api/auth/google/callback?code=${code}`;
-        
-        // This will redirect to frontend with tokens, so we don't need to handle response here
-        window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:30111'}${url}`;
+
+        window.location.href = `${getApiOrigin()}${url}`;
         return null;
     } catch (error) {
         console.error('Google callback error:', error);
@@ -132,9 +123,8 @@ const handleGoogleCallback = async (code: string): Promise<User | null> => {
 const handleGithubCallback = async (code: string): Promise<User | null> => {
     try {
         const url = `/api/auth/github/callback?code=${code}`;
-        
-        // This will redirect to frontend with tokens, so we don't need to handle response here
-        window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:30111'}${url}`;
+
+        window.location.href = `${getApiOrigin()}${url}`;
         return null;
     } catch (error) {
         console.error('GitHub callback error:', error);
