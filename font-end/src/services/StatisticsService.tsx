@@ -4,6 +4,7 @@ export interface StatisticsData {
   total_resources: number;
   uploads_today: number;
   total_downloads: number;
+  total_uploads?: number;
   files_pending_review: number;
   total_users?: number;
   total_file_types?: number;

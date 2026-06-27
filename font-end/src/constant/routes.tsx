@@ -1,4 +1,4 @@
-import { ProtectedRoute } from '../middleware/ProtectedRoute';
+import { ProtectedRoute } from '../components/ProtectedRoute';
 
 // ==================== USER ROUTES ====================
 export const userRoutes = [

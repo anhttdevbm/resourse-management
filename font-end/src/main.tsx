@@ -16,7 +16,7 @@ import { ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import { store } from './redux/store'
 import { Provider } from "react-redux";
-import AuthMiddleware from './middleware/authMiddleware'
+import AuthMiddleware from './middleware/AuthMiddleware'
 import LoginMiddleware from './middleware/NoAuthMiddleware'
 import {ReactQueryDevtools} from 'react-query/devtools'
 import { AuthProvider } from './contexts/AuthContext'
