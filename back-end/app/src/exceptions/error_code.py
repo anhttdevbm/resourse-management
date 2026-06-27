@@ -56,6 +56,15 @@ class BEErrorCode(Enum):
     AUTO_CLASSIFICATION_REORDER_INVALID = BusinessException(
         ExceptionDetail(message="Invalid auto classification rule order", code="BE0043")
     )
+    PERMISSION_NOT_FOUND = BusinessException(
+        ExceptionDetail(message="Permission Not Found", code="BE0044")
+    )
+    PERMISSION_EXITED = BusinessException(
+        ExceptionDetail(message="Permission Already Exists", code="BE0045")
+    )
+    PERMISSION_IN_USE = BusinessException(
+        ExceptionDetail(message="Permission is assigned to users", code="BE0046")
+    )
 
 class ServerErrorCode(Enum):
     """doc."""

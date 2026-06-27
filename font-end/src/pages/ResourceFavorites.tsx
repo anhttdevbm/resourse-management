@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import PageHeading from '../components/heading';
+import { useI18n } from '../i18n/I18nProvider';
 import {
   FavoritesService,
   FavoriteResourceRecord,
@@ -31,6 +32,8 @@ type DateRangeFilter = 'all' | '7d' | '30d';
 const FAVORITES_STORAGE_KEY = 'resource_favorites';
 
 const ResourceFavorites: React.FC = () => {
+  const { t, locale } = useI18n();
+  const dateLocale = locale === 'en' ? 'en-US' : 'vi-VN';
   const location = useLocation();
   const isMyFavoritesRoute = location.pathname === '/my-favorites';
 
@@ -191,22 +194,31 @@ const ResourceFavorites: React.FC = () => {
     loadFavorites();
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleString('vi-VN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return 'N/A';
-    }
-  };
+  const formatDate = useCallback(
+    (dateString: string) => {
+      try {
+        return new Date(dateString).toLocaleString(dateLocale, {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      } catch {
+        return 'N/A';
+      }
+    },
+    [dateLocale]
+  );
 
   const exportToCSV = () => {
-    const headers = ['ID', 'Tên', 'Phiên bản', 'URL', 'Ngày thêm'];
+    const headers = [
+      'ID',
+      t('favorites.col.name'),
+      t('favorites.col.version'),
+      'URL',
+      t('favorites.csv.addedAt'),
+    ];
     const rows = filteredAndSorted.map((r) => [
       r.id,
       r.name,
@@ -218,7 +230,7 @@ const ResourceFavorites: React.FC = () => {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `tai_nguyen_yeu_thich_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `${t('favorites.csv.filename')}_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -232,15 +244,17 @@ const ResourceFavorites: React.FC = () => {
   const breadcrumb = useMemo(
     () =>
       isMyFavoritesRoute
-        ? { title: 'Yêu thích của tôi', route: '/my-favorites' }
-        : { title: 'Tài nguyên yêu thích', route: '/resources/favorites' },
-    [isMyFavoritesRoute]
+        ? { title: t('favorites.breadcrumbMyFavorites'), route: '/my-favorites' }
+        : { title: t('favorites.breadcrumbFavorites'), route: '/resources/favorites' },
+    [isMyFavoritesRoute, t]
   );
 
-  const pageTitle = isMyFavoritesRoute ? 'Yêu thích của tôi' : 'Tài nguyên yêu thích';
+  const pageTitle = isMyFavoritesRoute
+    ? t('favorites.pageTitleMyFavorites')
+    : t('favorites.pageTitleFavorites');
   const pageDescription = isMyFavoritesRoute
-    ? 'Danh sách đánh dấu yêu thích (lưu cục bộ trên trình duyệt). Đồng bộ với mục Tài nguyên yêu thích trong Quản lý tài nguyên.'
-    : 'Các tài nguyên bạn đã đánh dấu yêu thích để truy cập nhanh';
+    ? t('favorites.pageDescMyFavorites')
+    : t('favorites.pageDescFavorites');
 
   return (
     <>
@@ -256,7 +270,7 @@ const ResourceFavorites: React.FC = () => {
                   </h2>
                   {isMyFavoritesRoute && (
                     <span className="inline-flex items-center rounded-full bg-pink-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-pink-800 ring-1 ring-inset ring-pink-600/20 dark:bg-pink-950/40 dark:text-pink-200 dark:ring-pink-400/25">
-                      Lưu cục bộ
+                      {t('favorites.badgeLocal')}
                     </span>
                   )}
                 </div>
@@ -267,12 +281,14 @@ const ResourceFavorites: React.FC = () => {
 
               <div className="flex flex-col gap-4 border-t border-gray-200/70 pt-5 dark:border-slate-700/70 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs font-medium text-gray-500 dark:text-slate-500">
-                  <span className="tabular-nums text-gray-800 dark:text-slate-300">{favorites.length}</span>{' '}
-                  mục yêu thích
+                  {t('favorites.count').replace('{count}', String(favorites.length))}
                   {filteredAndSorted.length !== favorites.length && (
                     <>
                       {' '}
-                      · <span className="tabular-nums">{filteredAndSorted.length}</span> sau lọc
+                      {t('favorites.afterFilter').replace(
+                        '{count}',
+                        String(filteredAndSorted.length)
+                      )}
                     </>
                   )}
                 </p>
@@ -286,7 +302,7 @@ const ResourceFavorites: React.FC = () => {
                       className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <FaFileExport className="h-4 w-4" />
-                      Xuất CSV
+                      {t('favorites.exportCsv')}
                     </button>
                     {isMyFavoritesRoute && (
                       <Link
@@ -294,7 +310,7 @@ const ResourceFavorites: React.FC = () => {
                         className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                       >
                         <FaExternalLinkAlt className="h-4 w-4 text-gray-500 dark:text-slate-400" />
-                        Tài nguyên yêu thích
+                        {t('favorites.linkFavorites')}
                       </Link>
                     )}
                     <Link
@@ -302,7 +318,7 @@ const ResourceFavorites: React.FC = () => {
                       className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                     >
                       <FaBoxOpen className="h-4 w-4 text-gray-500 dark:text-slate-400" />
-                      Danh sách tài nguyên
+                      {t('favorites.linkResourceList')}
                     </Link>
                   </div>
 
@@ -311,12 +327,12 @@ const ResourceFavorites: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setClearConfirm(true)}
-                        title="Bỏ đánh dấu yêu thích cho toàn bộ danh sách đã lưu trên trình duyệt"
+                        title={t('favorites.clearAllTitle')}
                         className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50/80 px-4 py-2.5 text-sm font-semibold text-red-800 transition hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/70 sm:w-auto"
                       >
                         <FaTrash className="h-4 w-4" />
-                        <span className="sm:hidden">Bỏ tất cả yêu thích</span>
-                        <span className="hidden sm:inline">Bỏ hết yêu thích</span>
+                        <span className="sm:hidden">{t('favorites.clearAllShort')}</span>
+                        <span className="hidden sm:inline">{t('favorites.clearAllLong')}</span>
                       </button>
                     </div>
                   )}
@@ -330,7 +346,7 @@ const ResourceFavorites: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 dark:border-slate-700 dark:bg-slate-900/40">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">Tổng yêu thích</p>
+                <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">{t('favorites.stats.total')}</p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">{stats.total}</p>
               </div>
               <div className="p-2 bg-pink-100 rounded-lg">
@@ -341,7 +357,7 @@ const ResourceFavorites: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 dark:border-slate-700 dark:bg-slate-900/40">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">Thêm tuần này</p>
+                <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">{t('favorites.stats.thisWeek')}</p>
                 <p className="text-2xl font-semibold text-green-600">{stats.thisWeek}</p>
               </div>
               <div className="p-2 bg-green-100 rounded-lg">
@@ -352,7 +368,7 @@ const ResourceFavorites: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 dark:border-slate-700 dark:bg-slate-900/40">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">Thêm tháng này</p>
+                <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">{t('favorites.stats.thisMonth')}</p>
                 <p className="text-2xl font-semibold text-purple-600">{stats.thisMonth}</p>
               </div>
               <div className="p-2 bg-purple-100 rounded-lg">
@@ -363,7 +379,7 @@ const ResourceFavorites: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 dark:border-slate-700 dark:bg-slate-900/40">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">Kết quả lọc</p>
+                <p className="text-xs text-gray-500 mb-1 dark:text-slate-400">{t('favorites.stats.filtered')}</p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">{stats.filtered}</p>
               </div>
             </div>
@@ -376,7 +392,7 @@ const ResourceFavorites: React.FC = () => {
               <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Tìm theo tên, phiên bản..."
+                placeholder={t('favorites.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -401,9 +417,9 @@ const ResourceFavorites: React.FC = () => {
               }}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
             >
-              <option value="all">Tất cả thời gian</option>
-              <option value="7d">7 ngày qua</option>
-              <option value="30d">30 ngày qua</option>
+              <option value="all">{t('favorites.dateRange.all')}</option>
+              <option value="7d">{t('favorites.dateRange.7d')}</option>
+              <option value="30d">{t('favorites.dateRange.30d')}</option>
             </select>
             <div className="flex gap-2">
               <button
@@ -412,7 +428,7 @@ const ResourceFavorites: React.FC = () => {
                   viewMode === 'table' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Bảng
+                {t('favorites.viewTable')}
               </button>
               <button
                 onClick={() => setViewMode('grid')}
@@ -420,7 +436,7 @@ const ResourceFavorites: React.FC = () => {
                   viewMode === 'grid' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Lưới
+                {t('favorites.viewGrid')}
               </button>
             </div>
             {(searchQuery || dateRange !== 'all') && (
@@ -430,7 +446,7 @@ const ResourceFavorites: React.FC = () => {
                 className="px-4 py-2 text-gray-600 hover:text-gray-800 dark:text-slate-300 text-sm font-medium flex items-center gap-2"
               >
                 <FaTimes className="w-3 h-3" />
-                Xóa bộ lọc
+                {t('favorites.resetFilters')}
               </button>
             )}
           </div>
@@ -440,16 +456,16 @@ const ResourceFavorites: React.FC = () => {
           {filteredAndSorted.length === 0 ? (
             <div className="py-12 px-4 text-center">
               <FaHeart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Chưa có tài nguyên yêu thích</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">{t('favorites.empty.title')}</h3>
               <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
-                Bạn có thể đánh dấu yêu thích từ trang Tài nguyên của tôi (icon trái tim) để xem nhanh tại đây.
+                {t('favorites.empty.hint')}
               </p>
               <Link
                 to="/resources"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
               >
                 <FaExternalLinkAlt className="w-4 h-4" />
-                Đi đến Tài nguyên của tôi
+                {t('favorites.empty.goResources')}
               </Link>
             </div>
           ) : viewMode === 'table' ? (
@@ -460,24 +476,24 @@ const ResourceFavorites: React.FC = () => {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         <button onClick={() => handleSort('name')} className="flex items-center gap-2 hover:text-blue-600">
-                          Tên
+                          {t('favorites.col.name')}
                           {getSortIcon('name')}
                         </button>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         <button onClick={() => handleSort('version')} className="flex items-center gap-2 hover:text-blue-600">
-                          Phiên bản
+                          {t('favorites.col.version')}
                           {getSortIcon('version')}
                         </button>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         <button onClick={() => handleSort('added_at')} className="flex items-center gap-2 hover:text-blue-600">
-                          Ngày thêm
+                          {t('favorites.col.addedAt')}
                           {getSortIcon('added_at')}
                         </button>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Thao tác
+                        {t('favorites.col.actions')}
                       </th>
                     </tr>
                   </thead>
@@ -507,7 +523,7 @@ const ResourceFavorites: React.FC = () => {
                             <Link
                               to={`/resources/${r.id}`}
                               className="p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg"
-                              title="Chi tiết"
+                              title={t('favorites.action.detail')}
                             >
                               <FaExternalLinkAlt className="w-4 h-4" />
                             </Link>
@@ -515,21 +531,21 @@ const ResourceFavorites: React.FC = () => {
                               type="button"
                               onClick={() => handleDownload(r.id)}
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                              title="Tải xuống"
+                              title={t('favorites.action.download')}
                             >
                               <FaDownload className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => setRemoveConfirm(r.id)}
                               className="p-2 text-pink-600 hover:bg-pink-50 rounded-lg"
-                              title="Bỏ yêu thích"
+                              title={t('favorites.action.unfavorite')}
                             >
                               <FaHeart className="w-4 h-4 fill-current" />
                             </button>
                             <button
                               onClick={() => setDeleteConfirm(r.id)}
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                              title="Xóa tài nguyên"
+                              title={t('favorites.action.deleteResource')}
                             >
                               <FaTrash className="w-4 h-4" />
                             </button>
@@ -543,7 +559,7 @@ const ResourceFavorites: React.FC = () => {
               {totalPages > 1 && (
                 <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-700">Hiển thị:</span>
+                    <span className="text-sm text-gray-700">{t('favorites.pagination.showing')}</span>
                     <select
                       value={itemsPerPage}
                       onChange={(e) => {
@@ -557,7 +573,9 @@ const ResourceFavorites: React.FC = () => {
                       <option value={50}>50</option>
                       <option value={100}>100</option>
                     </select>
-                    <span className="text-sm text-gray-700">/ Tổng {filteredAndSorted.length}</span>
+                    <span className="text-sm text-gray-700">
+                      {t('favorites.pagination.totalCount').replace('{count}', String(filteredAndSorted.length))}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -565,17 +583,19 @@ const ResourceFavorites: React.FC = () => {
                       disabled={currentPage === 1}
                       className="px-3 py-1 rounded-lg text-sm font-medium border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                     >
-                      Trước
+                      {t('favorites.pagination.prev')}
                     </button>
                     <span className="text-sm text-gray-700">
-                      Trang {currentPage} / {totalPages}
+                      {t('favorites.pagination.page')
+                        .replace('{current}', String(currentPage))
+                        .replace('{total}', String(totalPages))}
                     </span>
                     <button
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
                       className="px-3 py-1 rounded-lg text-sm font-medium border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                     >
-                      Sau
+                      {t('favorites.pagination.next')}
                     </button>
                   </div>
                 </div>
@@ -609,19 +629,19 @@ const ResourceFavorites: React.FC = () => {
                       className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-medium flex items-center justify-center gap-1"
                     >
                       <FaDownload className="w-3 h-3" />
-                      Tải xuống
+                      {t('favorites.grid.download')}
                     </button>
                     <button
                       onClick={() => setRemoveConfirm(r.id)}
                       className="px-3 py-2 bg-pink-100 text-pink-600 rounded-lg hover:bg-pink-200 text-xs"
-                      title="Bỏ yêu thích"
+                      title={t('favorites.action.unfavorite')}
                     >
                       <FaHeart className="w-3 h-3 fill-current" />
                     </button>
                     <button
                       onClick={() => setDeleteConfirm(r.id)}
                       className="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 text-xs"
-                      title="Xóa tài nguyên"
+                      title={t('favorites.action.deleteResource')}
                     >
                       <FaTrash className="w-3 h-3" />
                     </button>
@@ -635,17 +655,19 @@ const ResourceFavorites: React.FC = () => {
                     disabled={currentPage === 1}
                     className="px-3 py-1 rounded-lg text-sm border border-gray-300 disabled:opacity-50"
                   >
-                    Trước
+                    {t('favorites.pagination.prev')}
                   </button>
                   <span className="text-sm text-gray-700">
-                    Trang {currentPage} / {totalPages}
+                    {t('favorites.pagination.page')
+                      .replace('{current}', String(currentPage))
+                      .replace('{total}', String(totalPages))}
                   </span>
                   <button
                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
                     className="px-3 py-1 rounded-lg text-sm border border-gray-300 disabled:opacity-50"
                   >
-                    Sau
+                    {t('favorites.pagination.next')}
                   </button>
                 </div>
               )}
@@ -656,22 +678,22 @@ const ResourceFavorites: React.FC = () => {
         {removeConfirm && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Bỏ khỏi yêu thích</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('favorites.removeConfirm.title')}</h3>
               <p className="text-sm text-gray-600 mb-6">
-                Bạn có chắc muốn bỏ mục này khỏi danh sách yêu thích?
+                {t('favorites.removeConfirm.message')}
               </p>
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => setRemoveConfirm(null)}
                   className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
                 >
-                  Hủy
+                  {t('favorites.confirm.cancel')}
                 </button>
                 <button
                   onClick={() => handleRemove(removeConfirm)}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium"
                 >
-                  Bỏ yêu thích
+                  {t('favorites.confirm.unfavorite')}
                 </button>
               </div>
             </div>
@@ -681,22 +703,22 @@ const ResourceFavorites: React.FC = () => {
         {deleteConfirm && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Xóa tài nguyên</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('favorites.deleteConfirm.title')}</h3>
               <p className="text-sm text-gray-600 mb-6">
-                Tài nguyên sẽ bị xóa khỏi hệ thống và khỏi danh sách yêu thích. Bạn có chắc chắn?
+                {t('favorites.deleteConfirm.message')}
               </p>
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => setDeleteConfirm(null)}
                   className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
                 >
-                  Hủy
+                  {t('favorites.confirm.cancel')}
                 </button>
                 <button
                   onClick={() => handleDeleteResource(deleteConfirm)}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium"
                 >
-                  Xóa tài nguyên
+                  {t('favorites.confirm.deleteResource')}
                 </button>
               </div>
             </div>
@@ -706,23 +728,22 @@ const ResourceFavorites: React.FC = () => {
         {clearConfirm && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Bỏ tất cả yêu thích</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('favorites.clearConfirm.title')}</h3>
               <p className="text-sm text-gray-600 mb-6">
-                Toàn bộ mục sẽ bị bỏ khỏi danh sách yêu thích đã lưu trên trình duyệt (không xóa tài khoản
-                hay máy chủ).
+                {t('favorites.clearConfirm.message')}
               </p>
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => setClearConfirm(false)}
                   className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
                 >
-                  Hủy
+                  {t('favorites.confirm.cancel')}
                 </button>
                 <button
                   onClick={handleClearAll}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium"
                 >
-                  Bỏ tất cả
+                  {t('favorites.confirm.clearAll')}
                 </button>
               </div>
             </div>

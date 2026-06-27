@@ -6,7 +6,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from app.core.settings import settings
 from app.src.utils.email_utils import send_email
 from datetime import datetime, timedelta
@@ -18,6 +18,7 @@ from app.src.repositories.blacklist_token import BlackListTokenRepository
 from app.src.repositories.user import UserRepository
 from app.src.schemas.session import TokenPayload
 from app.src.schemas.user import UserCreate, UserUpdate, ChangePasswordRequest
+from app.src.schemas.permission import PermissionCreate, PermissionUpdate
 from app.src.schemas.user_settings import UserSettingsUpdate, default_user_settings
 from app.src.schemas.auth_schema import ResetPasswordRequest
 from app.src.utils.connection.sql_connection import get_db_session
@@ -267,6 +268,146 @@ class UserService(object):
             .all()
         )
         return [p.name for p in rows]
+
+    def _permission_user_count(self, db_session: Session, permission_id: uuid.UUID) -> int:
+        return (
+            db_session.query(func.count(UserHasPermission.id))
+            .filter(
+                UserHasPermission.permission_id == permission_id,
+                UserHasPermission.is_deleted.is_(False),
+            )
+            .scalar()
+            or 0
+        )
+
+    def _serialize_permission_admin(self, db_session: Session, perm: models.Permission) -> Dict[str, Any]:
+        return {
+            "id": str(perm.id),
+            "name": perm.name,
+            "created_at": perm.created_at.isoformat() if perm.created_at else None,
+            "updated_at": perm.updated_at.isoformat() if perm.updated_at else None,
+            "user_count": self._permission_user_count(db_session, perm.id),
+            "is_protected": perm.name in ADMIN_PERMISSION_NAMES,
+        }
+
+    def list_permissions_admin(self, db_session: Session, actor: models.User) -> List[Dict[str, Any]]:
+        if not self._has_admin_access(db_session, actor):
+            raise BEErrorCode.USER_NOT_PERMISSION.value
+        rows = (
+            db_session.query(models.Permission)
+            .filter(models.Permission.is_deleted.is_(False))
+            .order_by(models.Permission.name)
+            .all()
+        )
+        return [self._serialize_permission_admin(db_session, p) for p in rows]
+
+    def create_permission_admin(
+        self, db_session: Session, body: PermissionCreate, actor: models.User
+    ) -> Dict[str, Any]:
+        if not self._has_admin_access(db_session, actor):
+            raise BEErrorCode.USER_NOT_PERMISSION.value
+        name = body.name.strip()
+        if not name:
+            raise BEErrorCode.PERMISSION_NOT_FOUND.value
+        existing = (
+            db_session.query(models.Permission)
+            .filter(models.Permission.name == name, models.Permission.is_deleted.is_(False))
+            .first()
+        )
+        if existing:
+            raise BEErrorCode.PERMISSION_EXITED.value
+        perm = models.Permission(name=name, is_deleted=False)
+        db_session.add(perm)
+        db_session.commit()
+        db_session.refresh(perm)
+        return self._serialize_permission_admin(db_session, perm)
+
+    def update_permission_admin(
+        self,
+        db_session: Session,
+        permission_id: uuid.UUID,
+        body: PermissionUpdate,
+        actor: models.User,
+    ) -> Dict[str, Any]:
+        if not self._has_admin_access(db_session, actor):
+            raise BEErrorCode.USER_NOT_PERMISSION.value
+        perm = (
+            db_session.query(models.Permission)
+            .filter(models.Permission.id == permission_id, models.Permission.is_deleted.is_(False))
+            .first()
+        )
+        if not perm:
+            raise BEErrorCode.PERMISSION_NOT_FOUND.value
+        new_name = body.name.strip()
+        if not new_name:
+            raise BEErrorCode.PERMISSION_NOT_FOUND.value
+        dup = (
+            db_session.query(models.Permission)
+            .filter(
+                models.Permission.name == new_name,
+                models.Permission.id != permission_id,
+                models.Permission.is_deleted.is_(False),
+            )
+            .first()
+        )
+        if dup:
+            raise BEErrorCode.PERMISSION_EXITED.value
+        perm.name = new_name
+        db_session.commit()
+        db_session.refresh(perm)
+        return self._serialize_permission_admin(db_session, perm)
+
+    def delete_permission_admin(
+        self, db_session: Session, permission_id: uuid.UUID, actor: models.User
+    ) -> None:
+        if not self._has_admin_access(db_session, actor):
+            raise BEErrorCode.USER_NOT_PERMISSION.value
+        perm = (
+            db_session.query(models.Permission)
+            .filter(models.Permission.id == permission_id, models.Permission.is_deleted.is_(False))
+            .first()
+        )
+        if not perm:
+            raise BEErrorCode.PERMISSION_NOT_FOUND.value
+        if perm.name in ADMIN_PERMISSION_NAMES:
+            raise BEErrorCode.USER_NOT_PERMISSION.value
+        if self._permission_user_count(db_session, permission_id) > 0:
+            raise BEErrorCode.PERMISSION_IN_USE.value
+        perm.is_deleted = True
+        db_session.commit()
+
+    def get_permission_users_admin(
+        self, db_session: Session, permission_id: uuid.UUID, actor: models.User
+    ) -> List[Dict[str, Any]]:
+        if not self._has_admin_access(db_session, actor):
+            raise BEErrorCode.USER_NOT_PERMISSION.value
+        perm = (
+            db_session.query(models.Permission)
+            .filter(models.Permission.id == permission_id, models.Permission.is_deleted.is_(False))
+            .first()
+        )
+        if not perm:
+            raise BEErrorCode.PERMISSION_NOT_FOUND.value
+        from sqlalchemy.orm import joinedload
+
+        links = (
+            db_session.query(UserHasPermission)
+            .filter(
+                UserHasPermission.permission_id == permission_id,
+                UserHasPermission.is_deleted.is_(False),
+            )
+            .all()
+        )
+        user_ids = [link.user_system_id for link in links]
+        if not user_ids:
+            return []
+        users = (
+            db_session.query(models.User)
+            .options(joinedload(models.User.permissions))
+            .filter(models.User.id.in_(user_ids), models.User.is_deleted.is_(False))
+            .all()
+        )
+        return [self._serialize_user_admin(u) for u in users]
 
     def grant_permission_to_user(
         self, db_session: Session, user_id: uuid.UUID, permission_name: str, actor: models.User

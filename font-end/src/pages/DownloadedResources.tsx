@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import PageHeading from '../components/heading';
+import { useI18n } from '../i18n/I18nProvider';
 import {
   DownloadHistoryService,
   DownloadedResourceRecord,
@@ -30,6 +31,8 @@ type DateRangeFilter = 'all' | '7d' | '30d';
 const DOWNLOAD_HISTORY_STORAGE_KEY = 'resource_download_history';
 
 const DownloadedResources: React.FC = () => {
+  const { t, locale } = useI18n();
+  const dateLocale = locale === 'en' ? 'en-US' : 'vi-VN';
   const location = useLocation();
   const isMyDownloadsRoute = location.pathname === '/my-downloads';
 
@@ -197,22 +200,31 @@ const DownloadedResources: React.FC = () => {
     loadHistory();
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleString('vi-VN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return 'N/A';
-    }
-  };
+  const formatDate = useCallback(
+    (dateString: string) => {
+      try {
+        return new Date(dateString).toLocaleString(dateLocale, {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      } catch {
+        return 'N/A';
+      }
+    },
+    [dateLocale]
+  );
 
   const exportToCSV = () => {
-    const headers = ['ID', 'Tên', 'Phiên bản', 'URL', 'Ngày tải'];
+    const headers = [
+      'ID',
+      t('downloaded.col.name'),
+      t('downloaded.col.version'),
+      'URL',
+      t('downloaded.csv.downloadedAt'),
+    ];
     const rows = filteredAndSorted.map((r) => [
       r.id,
       r.name,
@@ -226,7 +238,7 @@ const DownloadedResources: React.FC = () => {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `tai_nguyen_da_tai_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `${t('downloaded.csv.filename')}_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -240,15 +252,17 @@ const DownloadedResources: React.FC = () => {
   const breadcrumb = useMemo(
     () =>
       isMyDownloadsRoute
-        ? { title: 'Lịch sử tải xuống', route: '/my-downloads' }
-        : { title: 'Tài nguyên đã tải', route: '/resources/downloaded' },
-    [isMyDownloadsRoute]
+        ? { title: t('downloaded.breadcrumbMyDownloads'), route: '/my-downloads' }
+        : { title: t('downloaded.breadcrumbDownloaded'), route: '/resources/downloaded' },
+    [isMyDownloadsRoute, t]
   );
 
-  const pageTitle = isMyDownloadsRoute ? 'Lịch sử tải xuống' : 'Tài nguyên đã tải';
+  const pageTitle = isMyDownloadsRoute
+    ? t('downloaded.pageTitleMyDownloads')
+    : t('downloaded.pageTitleDownloaded');
   const pageDescription = isMyDownloadsRoute
-    ? 'Các tài nguyên bạn đã tải (lưu cục bộ trên trình duyệt). Dữ liệu trùng với mục Tài nguyên đã tải trong Quản lý tài nguyên.'
-    : 'Lịch sử các tài nguyên bạn đã tải xuống từ hệ thống';
+    ? t('downloaded.pageDescMyDownloads')
+    : t('downloaded.pageDescDownloaded');
 
   return (
     <>
@@ -266,7 +280,7 @@ const DownloadedResources: React.FC = () => {
                     </h2>
                     {isMyDownloadsRoute && (
                       <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-blue-800 ring-1 ring-inset ring-blue-600/15 dark:bg-blue-950/60 dark:text-blue-200 dark:ring-blue-400/25">
-                        Lưu cục bộ
+                        {t('downloaded.badgeLocal')}
                       </span>
                     )}
                   </div>
@@ -278,12 +292,14 @@ const DownloadedResources: React.FC = () => {
 
               <div className="flex flex-col gap-4 border-t border-gray-200/70 pt-5 dark:border-slate-700/70 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs font-medium text-gray-500 dark:text-slate-500">
-                  <span className="tabular-nums text-gray-800 dark:text-slate-300">{history.length}</span>{' '}
-                  mục trong lịch sử
+                  {t('downloaded.historyCount').replace('{count}', String(history.length))}
                   {filteredAndSorted.length !== history.length && (
                     <>
                       {' '}
-                      · <span className="tabular-nums">{filteredAndSorted.length}</span> sau lọc
+                      {t('downloaded.afterFilter').replace(
+                        '{count}',
+                        String(filteredAndSorted.length)
+                      )}
                     </>
                   )}
                 </p>
@@ -297,7 +313,7 @@ const DownloadedResources: React.FC = () => {
                       className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <FaFileExport className="h-4 w-4" />
-                      Xuất CSV
+                      {t('downloaded.exportCsv')}
                     </button>
                     {isMyDownloadsRoute && (
                       <Link
@@ -305,7 +321,7 @@ const DownloadedResources: React.FC = () => {
                         className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                       >
                         <FaExternalLinkAlt className="h-4 w-4 text-gray-500 dark:text-slate-400" />
-                        Tài nguyên đã tải
+                        {t('downloaded.linkDownloaded')}
                       </Link>
                     )}
                     <Link
@@ -313,7 +329,7 @@ const DownloadedResources: React.FC = () => {
                       className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
                     >
                       <FaBoxOpen className="h-4 w-4 text-gray-500 dark:text-slate-400" />
-                      Danh sách tài nguyên
+                      {t('downloaded.linkResourceList')}
                     </Link>
                   </div>
 
@@ -322,12 +338,12 @@ const DownloadedResources: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setClearConfirm(true)}
-                        title="Xóa toàn bộ lịch sử đã lưu trên trình duyệt"
+                        title={t('downloaded.clearAllTitle')}
                         className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50/80 px-4 py-2.5 text-sm font-semibold text-red-800 transition hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/70 sm:w-auto"
                       >
                         <FaTrash className="h-4 w-4" />
-                        <span className="sm:hidden">Xóa toàn bộ lịch sử</span>
-                        <span className="hidden sm:inline">Xóa hết lịch sử</span>
+                        <span className="sm:hidden">{t('downloaded.clearAllShort')}</span>
+                        <span className="hidden sm:inline">{t('downloaded.clearAllLong')}</span>
                       </button>
                     </div>
                   )}
@@ -342,7 +358,7 @@ const DownloadedResources: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 mb-1">Tổng đã tải</p>
+                <p className="text-xs text-gray-500 mb-1">{t('downloaded.stats.total')}</p>
                 <p className="text-2xl font-semibold text-gray-900">{stats.total}</p>
               </div>
               <div className="p-2 bg-blue-100 rounded-lg">
@@ -353,7 +369,7 @@ const DownloadedResources: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 mb-1">Tuần này</p>
+                <p className="text-xs text-gray-500 mb-1">{t('downloaded.stats.thisWeek')}</p>
                 <p className="text-2xl font-semibold text-green-600">{stats.thisWeek}</p>
               </div>
               <div className="p-2 bg-green-100 rounded-lg">
@@ -364,7 +380,7 @@ const DownloadedResources: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 mb-1">Tháng này</p>
+                <p className="text-xs text-gray-500 mb-1">{t('downloaded.stats.thisMonth')}</p>
                 <p className="text-2xl font-semibold text-purple-600">{stats.thisMonth}</p>
               </div>
               <div className="p-2 bg-purple-100 rounded-lg">
@@ -375,7 +391,7 @@ const DownloadedResources: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 mb-1">Kết quả lọc</p>
+                <p className="text-xs text-gray-500 mb-1">{t('downloaded.stats.filtered')}</p>
                 <p className="text-2xl font-semibold text-gray-900">{stats.filtered}</p>
               </div>
             </div>
@@ -389,7 +405,7 @@ const DownloadedResources: React.FC = () => {
               <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Tìm theo tên, phiên bản..."
+                placeholder={t('downloaded.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -414,9 +430,9 @@ const DownloadedResources: React.FC = () => {
               }}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             >
-              <option value="all">Tất cả thời gian</option>
-              <option value="7d">7 ngày qua</option>
-              <option value="30d">30 ngày qua</option>
+              <option value="all">{t('downloaded.dateRange.all')}</option>
+              <option value="7d">{t('downloaded.dateRange.7d')}</option>
+              <option value="30d">{t('downloaded.dateRange.30d')}</option>
             </select>
             <div className="flex gap-2">
               <button
@@ -425,7 +441,7 @@ const DownloadedResources: React.FC = () => {
                   viewMode === 'table' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Bảng
+                {t('downloaded.viewTable')}
               </button>
               <button
                 onClick={() => setViewMode('grid')}
@@ -433,7 +449,7 @@ const DownloadedResources: React.FC = () => {
                   viewMode === 'grid' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Lưới
+                {t('downloaded.viewGrid')}
               </button>
             </div>
             {(searchQuery || dateRange !== 'all') && (
@@ -442,7 +458,7 @@ const DownloadedResources: React.FC = () => {
                 className="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm font-medium flex items-center gap-2"
               >
                 <FaTimes className="w-3 h-3" />
-                Xóa bộ lọc
+                {t('downloaded.resetFilters')}
               </button>
             )}
           </div>
@@ -453,23 +469,25 @@ const DownloadedResources: React.FC = () => {
           {filteredAndSorted.length === 0 ? (
             <div className="py-12 px-4 text-center">
               <FaBoxOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Chưa có tài nguyên đã tải</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">{t('downloaded.empty.title')}</h3>
               <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
-                Khi bạn tải xuống tài nguyên từ trang Tài nguyên của tôi, chúng sẽ xuất hiện tại đây.
+                {t('downloaded.empty.hint')}
               </p>
               <Link
                 to="/resources"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
               >
                 <FaExternalLinkAlt className="w-4 h-4" />
-                Đi đến Tài nguyên của tôi
+                {t('downloaded.empty.goResources')}
               </Link>
 
               {topDownloads.length > 0 && (
                 <div className="mt-10 text-left max-w-2xl mx-auto">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Gợi ý tải nhiều</h4>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                    {t('downloaded.empty.suggestions')}
+                  </h4>
                   {topLoading ? (
-                    <p className="text-sm text-gray-500">Đang tải...</p>
+                    <p className="text-sm text-gray-500">{t('downloaded.empty.loading')}</p>
                   ) : (
                     <ul className="space-y-2">
                       {topDownloads.map((r) => (
@@ -483,7 +501,12 @@ const DownloadedResources: React.FC = () => {
                               <span className="text-gray-400">.{r.extension.toLowerCase()}</span>
                             )}
                           </span>
-                          <span className="text-xs text-gray-500 ml-2">{r.downloads} lượt tải</span>
+                          <span className="text-xs text-gray-500 ml-2">
+                            {t('downloaded.empty.downloadCount').replace(
+                              '{count}',
+                              String(r.downloads)
+                            )}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -502,7 +525,7 @@ const DownloadedResources: React.FC = () => {
                           onClick={() => handleSort('name')}
                           className="flex items-center gap-2 hover:text-blue-600"
                         >
-                          Tên
+                          {t('downloaded.col.name')}
                           {getSortIcon('name')}
                         </button>
                       </th>
@@ -511,7 +534,7 @@ const DownloadedResources: React.FC = () => {
                           onClick={() => handleSort('version')}
                           className="flex items-center gap-2 hover:text-blue-600"
                         >
-                          Phiên bản
+                          {t('downloaded.col.version')}
                           {getSortIcon('version')}
                         </button>
                       </th>
@@ -520,12 +543,12 @@ const DownloadedResources: React.FC = () => {
                           onClick={() => handleSort('downloaded_at')}
                           className="flex items-center gap-2 hover:text-blue-600"
                         >
-                          Ngày tải
+                          {t('downloaded.col.downloadedAt')}
                           {getSortIcon('downloaded_at')}
                         </button>
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Thao tác
+                        {t('downloaded.col.actions')}
                       </th>
                     </tr>
                   </thead>
@@ -561,21 +584,21 @@ const DownloadedResources: React.FC = () => {
                             <Link
                               to={`/resources/${r.id}`}
                               className="p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 rounded-lg"
-                              title="Chi tiết"
+                              title={t('downloaded.action.detail')}
                             >
                               <FaExternalLinkAlt className="w-4 h-4" />
                             </Link>
                             <button
                               onClick={() => handleDownload(r.id)}
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                              title="Tải lại"
+                              title={t('downloaded.action.redownload')}
                             >
                               <FaDownload className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => setRemoveConfirm(r.id)}
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                              title="Xóa khỏi lịch sử"
+                              title={t('downloaded.action.remove')}
                             >
                               <FaTrash className="w-4 h-4" />
                             </button>
@@ -589,7 +612,7 @@ const DownloadedResources: React.FC = () => {
               {totalPages > 1 && (
                 <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-700">Hiển thị:</span>
+                    <span className="text-sm text-gray-700">{t('downloaded.pagination.showing')}</span>
                     <select
                       value={itemsPerPage}
                       onChange={(e) => {
@@ -603,7 +626,12 @@ const DownloadedResources: React.FC = () => {
                       <option value={50}>50</option>
                       <option value={100}>100</option>
                     </select>
-                    <span className="text-sm text-gray-700">/ Tổng {filteredAndSorted.length}</span>
+                    <span className="text-sm text-gray-700">
+                      {t('downloaded.pagination.totalCount').replace(
+                        '{count}',
+                        String(filteredAndSorted.length)
+                      )}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -611,17 +639,19 @@ const DownloadedResources: React.FC = () => {
                       disabled={currentPage === 1}
                       className="px-3 py-1 rounded-lg text-sm font-medium border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                     >
-                      Trước
+                      {t('downloaded.pagination.prev')}
                     </button>
                     <span className="text-sm text-gray-700">
-                      Trang {currentPage} / {totalPages}
+                      {t('downloaded.pagination.page')
+                        .replace('{current}', String(currentPage))
+                        .replace('{total}', String(totalPages))}
                     </span>
                     <button
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
                       className="px-3 py-1 rounded-lg text-sm font-medium border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                     >
-                      Sau
+                      {t('downloaded.pagination.next')}
                     </button>
                   </div>
                 </div>
@@ -655,7 +685,7 @@ const DownloadedResources: React.FC = () => {
                       className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-medium flex items-center justify-center gap-1"
                     >
                       <FaDownload className="w-3 h-3" />
-                      Tải lại
+                      {t('downloaded.action.redownload')}
                     </button>
                     <button
                       onClick={() => setRemoveConfirm(r.id)}
@@ -673,17 +703,19 @@ const DownloadedResources: React.FC = () => {
                     disabled={currentPage === 1}
                     className="px-3 py-1 rounded-lg text-sm border border-gray-300 disabled:opacity-50"
                   >
-                    Trước
+                    {t('downloaded.pagination.prev')}
                   </button>
                   <span className="text-sm text-gray-700">
-                    Trang {currentPage} / {totalPages}
+                    {t('downloaded.pagination.page')
+                      .replace('{current}', String(currentPage))
+                      .replace('{total}', String(totalPages))}
                   </span>
                   <button
                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
                     className="px-3 py-1 rounded-lg text-sm border border-gray-300 disabled:opacity-50"
                   >
-                    Sau
+                    {t('downloaded.pagination.next')}
                   </button>
                 </div>
               )}
@@ -695,22 +727,22 @@ const DownloadedResources: React.FC = () => {
         {removeConfirm && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Xóa khỏi lịch sử</h3>
-              <p className="text-sm text-gray-600 mb-6">
-                Bạn có chắc muốn xóa mục này khỏi danh sách tài nguyên đã tải? File đã tải vẫn nằm trên máy bạn.
-              </p>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                {t('downloaded.removeConfirm.title')}
+              </h3>
+              <p className="text-sm text-gray-600 mb-6">{t('downloaded.removeConfirm.message')}</p>
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => setRemoveConfirm(null)}
                   className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
                 >
-                  Hủy
+                  {t('downloaded.confirm.cancel')}
                 </button>
                 <button
                   onClick={() => handleRemove(removeConfirm)}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium"
                 >
-                  Xóa
+                  {t('downloaded.confirm.remove')}
                 </button>
               </div>
             </div>
@@ -721,22 +753,22 @@ const DownloadedResources: React.FC = () => {
         {clearConfirm && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md mx-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Xóa toàn bộ lịch sử</h3>
-              <p className="text-sm text-gray-600 mb-6">
-                Toàn bộ lịch sử tài nguyên đã tải sẽ bị xóa. Bạn có chắc chắn?
-              </p>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                {t('downloaded.clearConfirm.title')}
+              </h3>
+              <p className="text-sm text-gray-600 mb-6">{t('downloaded.clearConfirm.message')}</p>
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => setClearConfirm(false)}
                   className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
                 >
-                  Hủy
+                  {t('downloaded.confirm.cancel')}
                 </button>
                 <button
                   onClick={handleClearAll}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium"
                 >
-                  Xóa tất cả
+                  {t('downloaded.confirm.clearAll')}
                 </button>
               </div>
             </div>

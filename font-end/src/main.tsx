@@ -23,8 +23,10 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import Unauthorized from './pages/Unauthorized'
 import AdminUsers from './pages/admin/Users'
+import AdminPermissions from './pages/admin/Permissions'
 import AdminSystem from './pages/admin/System'
 import AdminReports from './pages/admin/Reports'
+import AdminResources from './pages/admin/Resources'
 import ForgotPassword from './components/ForgotPassword/ForgotPassword.jsx'
 import ResetPassword from './components/ResetPassword/ResetPassword.jsx'
 import NotificationsPage from './pages/Notifications'
@@ -546,7 +548,7 @@ const router = createBrowserRouter([
         path: '/admin/permissions',
         element: (
           <ProtectedRoute requiredPermission="manage_users">
-            <div>Phân quyền</div>
+            <AdminPermissions />
           </ProtectedRoute>
         )
       },
@@ -587,6 +589,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute requiredPermission="view_reports">
             <div>Resource Usage</div>
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: '/admin/resources',
+        element: (
+          <ProtectedRoute requiredPermission="manage_resources">
+            <AdminResources />
           </ProtectedRoute>
         )
       }

@@ -17,6 +17,7 @@ from app.src.schemas.user import (
     UserPermissionPatch,
 )
 from app.src.schemas.user_settings import UserSettingsUpdate
+from app.src.schemas.permission import PermissionCreate, PermissionUpdate
 from app.src.services.user_service import UserService
 from app.src.services.base_service import BaseService
 from app.src.utils.common import row2dict
@@ -71,6 +72,57 @@ def list_permission_names(
     """List all permission names (admin)."""
     data = user_service.list_permission_names(db_session, user[0])
     return ResponseObject(data={"permissions": data}, code="BE0000")
+
+
+@users_routers.get("/permissions")
+def list_permissions(
+    db_session: Session = Depends(get_db_session),
+    user: Tuple[User, str] = Depends(user_service.get_current_user),
+) -> ResponseObject:
+    """List all permissions with metadata (admin)."""
+    data = user_service.list_permissions_admin(db_session, user[0])
+    return ResponseObject(data={"permissions": data, "total": len(data)}, code="BE0000")
+
+
+@users_routers.post("/permissions")
+def create_permission(
+    body: PermissionCreate,
+    db_session: Session = Depends(get_db_session),
+    user: Tuple[User, str] = Depends(user_service.get_current_user),
+) -> ResponseObject:
+    data = user_service.create_permission_admin(db_session, body, user[0])
+    return ResponseObject(data=data, code="BE0000")
+
+
+@users_routers.put("/permissions/{permission_id}")
+def update_permission(
+    permission_id: UUID = Path(...),
+    body: PermissionUpdate = ...,
+    db_session: Session = Depends(get_db_session),
+    user: Tuple[User, str] = Depends(user_service.get_current_user),
+) -> ResponseObject:
+    data = user_service.update_permission_admin(db_session, permission_id, body, user[0])
+    return ResponseObject(data=data, code="BE0000")
+
+
+@users_routers.delete("/permissions/{permission_id}")
+def delete_permission(
+    permission_id: UUID = Path(...),
+    db_session: Session = Depends(get_db_session),
+    user: Tuple[User, str] = Depends(user_service.get_current_user),
+) -> ResponseObject:
+    user_service.delete_permission_admin(db_session, permission_id, user[0])
+    return ResponseObject(message="Delete permission success", code="BE0000")
+
+
+@users_routers.get("/permissions/{permission_id}/users")
+def list_permission_users(
+    permission_id: UUID = Path(...),
+    db_session: Session = Depends(get_db_session),
+    user: Tuple[User, str] = Depends(user_service.get_current_user),
+) -> ResponseObject:
+    users = user_service.get_permission_users_admin(db_session, permission_id, user[0])
+    return ResponseObject(data={"users": users, "total": len(users)}, code="BE0000")
 
 
 @users_routers.post("/users/{user_id}/permissions")

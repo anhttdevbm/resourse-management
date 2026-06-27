@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Unauthorized from './pages/Unauthorized';
 import AdminUsers from './pages/admin/Users';
+import AdminPermissions from './pages/admin/Permissions';
 import AdminSystem from './pages/admin/System';
 import AdminReports from './pages/admin/Reports';
 import NotificationsPage from './pages/Notifications';
@@ -112,7 +113,7 @@ function App() {
           
           <Route path="/admin/permissions" element={
             <ProtectedRoute requiredPermission="manage_users">
-              <div>Phân quyền</div>
+              <AdminPermissions />
             </ProtectedRoute>
           } />
           

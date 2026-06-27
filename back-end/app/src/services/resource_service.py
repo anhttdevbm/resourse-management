@@ -24,6 +24,10 @@ reusable_oauth2 = HTTPBearer(scheme_name="Authorization")
 user_service = UserService()
 
 
+def _user_has_admin_access(db_session: Session, user: User) -> bool:
+    return user_service._has_admin_access(db_session, user)
+
+
 class ResourceService:
     """Define resource service."""
 
@@ -132,8 +136,8 @@ class ResourceService:
         if not resource:
             raise BEErrorCode.RESOURCE_NOT_FOUND.value
 
-        # Chỉ cho phép nếu là chủ tài nguyên hoặc được share
-        if resource.user_id != user.id:
+        # Admin hoặc chủ tài nguyên / được share
+        if resource.user_id != user.id and not _user_has_admin_access(db_session, user):
             share = db_session.query(models.ResourceShare).filter(
                 models.ResourceShare.resource_id == resource.id,
                 models.ResourceShare.shared_with_user_id == user.id,
@@ -278,6 +282,89 @@ class ResourceService:
         resources = own_q.union(shared_q).all()
         sorted_resource = sorted(resources, key=lambda x: x.created_at)
         return sorted_resource
+
+    def search_all_resources(
+        self,
+        db_session: Session,
+        filters: ResourceGet,
+        actor: User,
+        *,
+        include_deleted: bool = False,
+    ) -> List[models.Resource]:
+        """List all resources in the system (admin only)."""
+        if not _user_has_admin_access(db_session, actor):
+            raise BEErrorCode.USER_NOT_PERMISSION.value
+
+        query = db_session.query(models.Resource)
+        if not include_deleted:
+            query = query.filter(models.Resource.is_deleted.is_(False))
+        if filters.id:
+            query = query.filter(models.Resource.id == filters.id)
+        if filters.stage_id:
+            query = query.filter(models.Resource.stage_id == filters.stage_id)
+        if filters.status_id:
+            query = query.filter(models.Resource.status_id == filters.status_id)
+        if filters.name:
+            query = query.filter(models.Resource.name.like(f"%{filters.name}%"))
+        if filters.version:
+            query = query.filter(models.Resource.version == filters.version)
+        if filters.platform_id:
+            query = query.filter(models.Resource.platform_id == filters.platform_id)
+        if filters.product_type_id:
+            query = query.filter(models.Resource.product_type_id == filters.product_type_id)
+        if filters.repo_id:
+            query = query.filter(models.Resource.repo_id == filters.repo_id)
+
+        resources = query.all()
+        return sorted(resources, key=lambda x: x.created_at, reverse=True)
+
+    def admin_update(
+        self,
+        db_session: Session,
+        resource_id: str,
+        resource_update: ResourceUpdate,
+        actor: User,
+    ) -> models.Resource:
+        """Update any resource (admin only)."""
+        if not _user_has_admin_access(db_session, actor):
+            raise BEErrorCode.USER_NOT_PERMISSION.value
+        resource = self.file_repository.get(db_session, resource_id)
+        if not resource:
+            deleted = self.file_repository.get_back_up(db_session, obj_id=resource_id)
+            if not deleted:
+                raise BEErrorCode.RESOURCE_NOT_FOUND.value
+            resource = deleted
+        update_data = {}
+        for key, value in resource_update.dict(exclude_unset=True).items():
+            if value is not None and value != "string":
+                update_data[key] = value
+        if update_data:
+            self.file_repository.update(db_session, obj_id=resource_id, obj_in=update_data)
+        resource = self.file_repository.get(db_session, resource_id)
+        if not resource:
+            resource = self.file_repository.get_back_up(db_session, obj_id=resource_id)
+        if not resource:
+            raise BEErrorCode.RESOURCE_NOT_FOUND.value
+        return resource
+
+    def admin_delete(self, db_session: Session, resource_id: str, actor: User) -> None:
+        """Soft-delete any resource (admin only)."""
+        if not _user_has_admin_access(db_session, actor):
+            raise BEErrorCode.USER_NOT_PERMISSION.value
+        resource = self.file_repository.get(db_session, resource_id)
+        if not resource:
+            raise BEErrorCode.RESOURCE_NOT_FOUND.value
+        self.file_repository.delete(db_session, obj_id=resource.id)
+
+    def admin_restore(self, db_session: Session, resource_id: str, actor: User) -> models.Resource:
+        """Restore a soft-deleted resource (admin only)."""
+        if not _user_has_admin_access(db_session, actor):
+            raise BEErrorCode.USER_NOT_PERMISSION.value
+        resource = self.file_repository.get_back_up(db_session, obj_id=resource_id)
+        if not resource:
+            raise BEErrorCode.RESOURCE_NOT_FOUND.value
+        self.file_repository.back_up(db_session, obj_id=resource.id)
+        return self.file_repository.get(db_session, resource_id)
 
     def update(self, db_session: Session, resource_id: int, resource_update: ResourceUpdate, user) -> models.Resource:
         """Update an existing resource."""

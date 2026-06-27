@@ -22,6 +22,46 @@ resource_service = ResourceService()
 resource_routers = APIRouter()
 
 
+def _enrich_resource(resource: models.Resource, db_session: Session) -> dict:
+    """Serialize resource with related entities and owner info."""
+    item = row2dict(resource)
+
+    status = getattr(resource, "resource_status", None)
+    if status:
+        item["resource_status"] = {"id": str(status.id), "name": status.name}
+
+    platform = getattr(resource, "resource_platform", None)
+    if platform:
+        item["resource_platform"] = {"id": str(platform.id), "name": platform.name}
+
+    product_type = getattr(resource, "product_type", None)
+    if product_type:
+        item["product_type"] = {"id": str(product_type.id), "name": product_type.name}
+
+    package_repo = getattr(resource, "package_repo", None)
+    if package_repo:
+        item["package_repo"] = {"id": str(package_repo.id), "name": package_repo.name}
+
+    stage = getattr(resource, "resource_stage", None)
+    if stage:
+        item["resource_stage"] = {"id": str(stage.id), "name": stage.name}
+
+    tags = getattr(resource, "resource_tags", None)
+    if tags:
+        item["resource_tags"] = [{"id": str(tag.id), "name": tag.name} for tag in tags]
+
+    if resource.user_id:
+        owner = db_session.query(models.User).filter(models.User.id == resource.user_id).first()
+        if owner:
+            item["owner"] = {
+                "id": str(owner.id),
+                "name": owner.name,
+                "email": owner.email,
+            }
+
+    return item
+
+
 @resource_routers.post('/', response_model=ResponseObject)
 async def create_one(
     user: Tuple[User, str] = Depends(user_service.get_current_user),
@@ -106,48 +146,7 @@ def get_resources(
 
     enriched_resources = []
     for resource in resources:
-      item = row2dict(resource)
-
-      # Trạng thái
-      status = getattr(resource, "resource_status", None)
-      if status:
-          item["resource_status"] = {
-              "id": str(status.id),
-              "name": status.name,
-          }
-
-      # Platform (ResourcePlatform.backref = "resource_platform")
-      platform = getattr(resource, "resource_platform", None)
-      if platform:
-          item["resource_platform"] = {
-              "id": str(platform.id),
-              "name": platform.name,
-          }
-
-      # Loại sản phẩm (ProductType.backref = "product_type")
-      product_type = getattr(resource, "product_type", None)
-      if product_type:
-          item["product_type"] = {
-              "id": str(product_type.id),
-              "name": product_type.name,
-          }
-
-      # Kho (PackageRepository.backref = "package_repo")
-      package_repo = getattr(resource, "package_repo", None)
-      if package_repo:
-          item["package_repo"] = {
-              "id": str(package_repo.id),
-              "name": package_repo.name,
-          }
-
-      # Tags (nhiều- nhiều)
-      tags = getattr(resource, "resource_tags", None)
-      if tags:
-          item["resource_tags"] = [
-              {"id": str(tag.id), "name": tag.name} for tag in tags
-          ]
-
-      enriched_resources.append(item)
+      enriched_resources.append(_enrich_resource(resource, db_session))
 
     return ResponseObject(data=enriched_resources, code="BE0000")
 
@@ -216,3 +215,73 @@ def remove_resource_share(
 
     resource_service.remove_share(db_session, resource_id, uuid.UUID(target_user_id), user[0])
     return ResponseObject(message="Remove share success", code="BE0000")
+
+
+@resource_routers.get("/admin/resources/")
+def admin_list_resources(
+    id: Optional[str] = Query(None),
+    name: Optional[str] = Query(None),
+    version: Optional[str] = Query(None),
+    stage_id: Optional[str] = Query(None),
+    status_id: Optional[str] = Query(None),
+    platform_id: Optional[str] = Query(None),
+    product_type_id: Optional[str] = Query(None),
+    repo_id: Optional[str] = Query(None),
+    tag_id: Optional[str] = Query(None),
+    include_deleted: bool = Query(False),
+    db_session: Session = Depends(get_db_session),
+    user: Tuple[User, str] = Depends(user_service.get_current_user),
+) -> ResponseObject:
+    """List all resources (admin only)."""
+    filters = ResourceGet(
+        id=id,
+        name=name,
+        version=version,
+        stage_id=stage_id,
+        status_id=status_id,
+        platform_id=platform_id,
+        product_type_id=product_type_id,
+        repo_id=repo_id,
+        tag_id=tag_id,
+    )
+    resources = resource_service.search_all_resources(
+        db_session, filters, user[0], include_deleted=include_deleted
+    )
+    return ResponseObject(
+        data=[_enrich_resource(r, db_session) for r in resources],
+        code="BE0000",
+    )
+
+
+@resource_routers.put("/admin/resources/{resource_id}")
+def admin_update_resource(
+    resource_id: str,
+    resource_update: ResourceUpdate,
+    db_session: Session = Depends(get_db_session),
+    user: Tuple[User, str] = Depends(user_service.get_current_user),
+) -> ResponseObject:
+    """Update any resource (admin only)."""
+    data = resource_service.admin_update(db_session, resource_id, resource_update, user[0])
+    return ResponseObject(data=_enrich_resource(data, db_session), code="BE0000")
+
+
+@resource_routers.delete("/admin/resources/{resource_id}")
+def admin_delete_resource(
+    resource_id: str,
+    db_session: Session = Depends(get_db_session),
+    user: Tuple[User, str] = Depends(user_service.get_current_user),
+) -> ResponseObject:
+    """Soft-delete any resource (admin only)."""
+    resource_service.admin_delete(db_session, resource_id, user[0])
+    return ResponseObject(message="Delete Resource Success", code="BE0000")
+
+
+@resource_routers.post("/admin/resources/{resource_id}/restore")
+def admin_restore_resource(
+    resource_id: str,
+    db_session: Session = Depends(get_db_session),
+    user: Tuple[User, str] = Depends(user_service.get_current_user),
+) -> ResponseObject:
+    """Restore a soft-deleted resource (admin only)."""
+    data = resource_service.admin_restore(db_session, resource_id, user[0])
+    return ResponseObject(data=_enrich_resource(data, db_session), code="BE0000", message="Restore success")

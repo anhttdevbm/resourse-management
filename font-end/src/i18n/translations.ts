@@ -251,7 +251,115 @@ export type TranslationKey =
   | "resources.pagination.totalCount"
   | "resources.pagination.prev"
   | "resources.pagination.next"
-  | "resources.pagination.page";
+  | "resources.pagination.page"
+  | "downloaded.breadcrumbDownloaded"
+  | "downloaded.breadcrumbMyDownloads"
+  | "downloaded.pageTitleDownloaded"
+  | "downloaded.pageTitleMyDownloads"
+  | "downloaded.pageDescDownloaded"
+  | "downloaded.pageDescMyDownloads"
+  | "downloaded.badgeLocal"
+  | "downloaded.historyCount"
+  | "downloaded.afterFilter"
+  | "downloaded.exportCsv"
+  | "downloaded.linkDownloaded"
+  | "downloaded.linkResourceList"
+  | "downloaded.clearAllTitle"
+  | "downloaded.clearAllShort"
+  | "downloaded.clearAllLong"
+  | "downloaded.stats.total"
+  | "downloaded.stats.thisWeek"
+  | "downloaded.stats.thisMonth"
+  | "downloaded.stats.filtered"
+  | "downloaded.searchPlaceholder"
+  | "downloaded.dateRange.all"
+  | "downloaded.dateRange.7d"
+  | "downloaded.dateRange.30d"
+  | "downloaded.viewTable"
+  | "downloaded.viewGrid"
+  | "downloaded.resetFilters"
+  | "downloaded.empty.title"
+  | "downloaded.empty.hint"
+  | "downloaded.empty.goResources"
+  | "downloaded.empty.suggestions"
+  | "downloaded.empty.loading"
+  | "downloaded.empty.downloadCount"
+  | "downloaded.col.name"
+  | "downloaded.col.version"
+  | "downloaded.col.downloadedAt"
+  | "downloaded.col.actions"
+  | "downloaded.action.detail"
+  | "downloaded.action.redownload"
+  | "downloaded.action.remove"
+  | "downloaded.pagination.showing"
+  | "downloaded.pagination.totalCount"
+  | "downloaded.pagination.prev"
+  | "downloaded.pagination.next"
+  | "downloaded.pagination.page"
+  | "downloaded.removeConfirm.title"
+  | "downloaded.removeConfirm.message"
+  | "downloaded.clearConfirm.title"
+  | "downloaded.clearConfirm.message"
+  | "downloaded.confirm.cancel"
+  | "downloaded.confirm.remove"
+  | "downloaded.confirm.clearAll"
+  | "downloaded.csv.filename"
+  | "downloaded.csv.downloadedAt"
+  | "favorites.breadcrumbFavorites"
+  | "favorites.breadcrumbMyFavorites"
+  | "favorites.pageTitleFavorites"
+  | "favorites.pageTitleMyFavorites"
+  | "favorites.pageDescFavorites"
+  | "favorites.pageDescMyFavorites"
+  | "favorites.badgeLocal"
+  | "favorites.count"
+  | "favorites.afterFilter"
+  | "favorites.exportCsv"
+  | "favorites.linkFavorites"
+  | "favorites.linkResourceList"
+  | "favorites.clearAllTitle"
+  | "favorites.clearAllShort"
+  | "favorites.clearAllLong"
+  | "favorites.stats.total"
+  | "favorites.stats.thisWeek"
+  | "favorites.stats.thisMonth"
+  | "favorites.stats.filtered"
+  | "favorites.searchPlaceholder"
+  | "favorites.dateRange.all"
+  | "favorites.dateRange.7d"
+  | "favorites.dateRange.30d"
+  | "favorites.viewTable"
+  | "favorites.viewGrid"
+  | "favorites.resetFilters"
+  | "favorites.empty.title"
+  | "favorites.empty.hint"
+  | "favorites.empty.goResources"
+  | "favorites.col.name"
+  | "favorites.col.version"
+  | "favorites.col.addedAt"
+  | "favorites.col.actions"
+  | "favorites.action.detail"
+  | "favorites.action.download"
+  | "favorites.action.unfavorite"
+  | "favorites.action.deleteResource"
+  | "favorites.grid.download"
+  | "favorites.pagination.showing"
+  | "favorites.pagination.totalCount"
+  | "favorites.pagination.prev"
+  | "favorites.pagination.next"
+  | "favorites.pagination.page"
+  | "favorites.removeConfirm.title"
+  | "favorites.removeConfirm.message"
+  | "favorites.deleteConfirm.title"
+  | "favorites.deleteConfirm.message"
+  | "favorites.clearConfirm.title"
+  | "favorites.clearConfirm.message"
+  | "favorites.confirm.cancel"
+  | "favorites.confirm.unfavorite"
+  | "favorites.confirm.deleteResource"
+  | "favorites.confirm.clearAll"
+  | "favorites.csv.filename"
+  | "favorites.csv.addedAt";
 
 const vi: Record<TranslationKey, string> = {
   "settings.title": "Cài đặt",
@@ -507,6 +615,120 @@ const vi: Record<TranslationKey, string> = {
   "resources.pagination.prev": "Trước",
   "resources.pagination.next": "Sau",
   "resources.pagination.page": "Trang {current} / {total}",
+  "downloaded.breadcrumbDownloaded": "Tài nguyên đã tải",
+  "downloaded.breadcrumbMyDownloads": "Lịch sử tải xuống",
+  "downloaded.pageTitleDownloaded": "Tài nguyên đã tải",
+  "downloaded.pageTitleMyDownloads": "Lịch sử tải xuống",
+  "downloaded.pageDescDownloaded": "Lịch sử các tài nguyên bạn đã tải xuống từ hệ thống",
+  "downloaded.pageDescMyDownloads":
+    "Các tài nguyên bạn đã tải (lưu cục bộ trên trình duyệt). Dữ liệu trùng với mục Tài nguyên đã tải trong Quản lý tài nguyên.",
+  "downloaded.badgeLocal": "Lưu cục bộ",
+  "downloaded.historyCount": "{count} mục trong lịch sử",
+  "downloaded.afterFilter": "· {count} sau lọc",
+  "downloaded.exportCsv": "Xuất CSV",
+  "downloaded.linkDownloaded": "Tài nguyên đã tải",
+  "downloaded.linkResourceList": "Danh sách tài nguyên",
+  "downloaded.clearAllTitle": "Xóa toàn bộ lịch sử đã lưu trên trình duyệt",
+  "downloaded.clearAllShort": "Xóa toàn bộ lịch sử",
+  "downloaded.clearAllLong": "Xóa hết lịch sử",
+  "downloaded.stats.total": "Tổng đã tải",
+  "downloaded.stats.thisWeek": "Tuần này",
+  "downloaded.stats.thisMonth": "Tháng này",
+  "downloaded.stats.filtered": "Kết quả lọc",
+  "downloaded.searchPlaceholder": "Tìm theo tên, phiên bản...",
+  "downloaded.dateRange.all": "Tất cả thời gian",
+  "downloaded.dateRange.7d": "7 ngày qua",
+  "downloaded.dateRange.30d": "30 ngày qua",
+  "downloaded.viewTable": "Bảng",
+  "downloaded.viewGrid": "Lưới",
+  "downloaded.resetFilters": "Xóa bộ lọc",
+  "downloaded.empty.title": "Chưa có tài nguyên đã tải",
+  "downloaded.empty.hint": "Khi bạn tải xuống tài nguyên từ trang Tài nguyên của tôi, chúng sẽ xuất hiện tại đây.",
+  "downloaded.empty.goResources": "Đi đến Tài nguyên của tôi",
+  "downloaded.empty.suggestions": "Gợi ý tải nhiều",
+  "downloaded.empty.loading": "Đang tải...",
+  "downloaded.empty.downloadCount": "{count} lượt tải",
+  "downloaded.col.name": "Tên",
+  "downloaded.col.version": "Phiên bản",
+  "downloaded.col.downloadedAt": "Ngày tải",
+  "downloaded.col.actions": "Thao tác",
+  "downloaded.action.detail": "Chi tiết",
+  "downloaded.action.redownload": "Tải lại",
+  "downloaded.action.remove": "Xóa khỏi lịch sử",
+  "downloaded.pagination.showing": "Hiển thị:",
+  "downloaded.pagination.totalCount": "/ Tổng {count}",
+  "downloaded.pagination.prev": "Trước",
+  "downloaded.pagination.next": "Sau",
+  "downloaded.pagination.page": "Trang {current} / {total}",
+  "downloaded.removeConfirm.title": "Xóa khỏi lịch sử",
+  "downloaded.removeConfirm.message":
+    "Bạn có chắc muốn xóa mục này khỏi danh sách tài nguyên đã tải? File đã tải vẫn nằm trên máy bạn.",
+  "downloaded.clearConfirm.title": "Xóa toàn bộ lịch sử",
+  "downloaded.clearConfirm.message": "Toàn bộ lịch sử tài nguyên đã tải sẽ bị xóa. Bạn có chắc chắn?",
+  "downloaded.confirm.cancel": "Hủy",
+  "downloaded.confirm.remove": "Xóa",
+  "downloaded.confirm.clearAll": "Xóa tất cả",
+  "downloaded.csv.filename": "tai_nguyen_da_tai",
+  "downloaded.csv.downloadedAt": "Ngày tải",
+  "favorites.breadcrumbFavorites": "Tài nguyên yêu thích",
+  "favorites.breadcrumbMyFavorites": "Yêu thích của tôi",
+  "favorites.pageTitleFavorites": "Tài nguyên yêu thích",
+  "favorites.pageTitleMyFavorites": "Yêu thích của tôi",
+  "favorites.pageDescFavorites": "Các tài nguyên bạn đã đánh dấu yêu thích để truy cập nhanh",
+  "favorites.pageDescMyFavorites":
+    "Danh sách đánh dấu yêu thích (lưu cục bộ trên trình duyệt). Đồng bộ với mục Tài nguyên yêu thích trong Quản lý tài nguyên.",
+  "favorites.badgeLocal": "Lưu cục bộ",
+  "favorites.count": "{count} mục yêu thích",
+  "favorites.afterFilter": "· {count} sau lọc",
+  "favorites.exportCsv": "Xuất CSV",
+  "favorites.linkFavorites": "Tài nguyên yêu thích",
+  "favorites.linkResourceList": "Danh sách tài nguyên",
+  "favorites.clearAllTitle": "Bỏ đánh dấu yêu thích cho toàn bộ danh sách đã lưu trên trình duyệt",
+  "favorites.clearAllShort": "Bỏ tất cả yêu thích",
+  "favorites.clearAllLong": "Bỏ hết yêu thích",
+  "favorites.stats.total": "Tổng yêu thích",
+  "favorites.stats.thisWeek": "Thêm tuần này",
+  "favorites.stats.thisMonth": "Thêm tháng này",
+  "favorites.stats.filtered": "Kết quả lọc",
+  "favorites.searchPlaceholder": "Tìm theo tên, phiên bản...",
+  "favorites.dateRange.all": "Tất cả thời gian",
+  "favorites.dateRange.7d": "7 ngày qua",
+  "favorites.dateRange.30d": "30 ngày qua",
+  "favorites.viewTable": "Bảng",
+  "favorites.viewGrid": "Lưới",
+  "favorites.resetFilters": "Xóa bộ lọc",
+  "favorites.empty.title": "Chưa có tài nguyên yêu thích",
+  "favorites.empty.hint":
+    "Bạn có thể đánh dấu yêu thích từ trang Tài nguyên của tôi (icon trái tim) để xem nhanh tại đây.",
+  "favorites.empty.goResources": "Đi đến Tài nguyên của tôi",
+  "favorites.col.name": "Tên",
+  "favorites.col.version": "Phiên bản",
+  "favorites.col.addedAt": "Ngày thêm",
+  "favorites.col.actions": "Thao tác",
+  "favorites.action.detail": "Chi tiết",
+  "favorites.action.download": "Tải xuống",
+  "favorites.action.unfavorite": "Bỏ yêu thích",
+  "favorites.action.deleteResource": "Xóa tài nguyên",
+  "favorites.grid.download": "Tải xuống",
+  "favorites.pagination.showing": "Hiển thị:",
+  "favorites.pagination.totalCount": "/ Tổng {count}",
+  "favorites.pagination.prev": "Trước",
+  "favorites.pagination.next": "Sau",
+  "favorites.pagination.page": "Trang {current} / {total}",
+  "favorites.removeConfirm.title": "Bỏ khỏi yêu thích",
+  "favorites.removeConfirm.message": "Bạn có chắc muốn bỏ mục này khỏi danh sách yêu thích?",
+  "favorites.deleteConfirm.title": "Xóa tài nguyên",
+  "favorites.deleteConfirm.message":
+    "Tài nguyên sẽ bị xóa khỏi hệ thống và khỏi danh sách yêu thích. Bạn có chắc chắn?",
+  "favorites.clearConfirm.title": "Bỏ tất cả yêu thích",
+  "favorites.clearConfirm.message":
+    "Toàn bộ mục sẽ bị bỏ khỏi danh sách yêu thích đã lưu trên trình duyệt (không xóa tài khoản hay máy chủ).",
+  "favorites.confirm.cancel": "Hủy",
+  "favorites.confirm.unfavorite": "Bỏ yêu thích",
+  "favorites.confirm.deleteResource": "Xóa tài nguyên",
+  "favorites.confirm.clearAll": "Bỏ tất cả",
+  "favorites.csv.filename": "tai_nguyen_yeu_thich",
+  "favorites.csv.addedAt": "Ngày thêm",
 };
 
 const en: Record<TranslationKey, string> = {
@@ -763,6 +985,120 @@ const en: Record<TranslationKey, string> = {
   "resources.pagination.prev": "Previous",
   "resources.pagination.next": "Next",
   "resources.pagination.page": "Page {current} / {total}",
+  "downloaded.breadcrumbDownloaded": "Downloaded resources",
+  "downloaded.breadcrumbMyDownloads": "Download history",
+  "downloaded.pageTitleDownloaded": "Downloaded resources",
+  "downloaded.pageTitleMyDownloads": "Download history",
+  "downloaded.pageDescDownloaded": "History of resources you have downloaded from the system",
+  "downloaded.pageDescMyDownloads":
+    "Resources you downloaded (stored locally in your browser). Same data as Downloaded resources under Resource management.",
+  "downloaded.badgeLocal": "Local storage",
+  "downloaded.historyCount": "{count} items in history",
+  "downloaded.afterFilter": "· {count} after filter",
+  "downloaded.exportCsv": "Export CSV",
+  "downloaded.linkDownloaded": "Downloaded resources",
+  "downloaded.linkResourceList": "Resource list",
+  "downloaded.clearAllTitle": "Clear all history saved in the browser",
+  "downloaded.clearAllShort": "Clear all history",
+  "downloaded.clearAllLong": "Clear history",
+  "downloaded.stats.total": "Total downloaded",
+  "downloaded.stats.thisWeek": "This week",
+  "downloaded.stats.thisMonth": "This month",
+  "downloaded.stats.filtered": "Filtered results",
+  "downloaded.searchPlaceholder": "Search by name, version…",
+  "downloaded.dateRange.all": "All time",
+  "downloaded.dateRange.7d": "Last 7 days",
+  "downloaded.dateRange.30d": "Last 30 days",
+  "downloaded.viewTable": "Table",
+  "downloaded.viewGrid": "Grid",
+  "downloaded.resetFilters": "Clear filters",
+  "downloaded.empty.title": "No downloaded resources yet",
+  "downloaded.empty.hint": "When you download resources from My resources, they will appear here.",
+  "downloaded.empty.goResources": "Go to My resources",
+  "downloaded.empty.suggestions": "Popular downloads",
+  "downloaded.empty.loading": "Loading…",
+  "downloaded.empty.downloadCount": "{count} downloads",
+  "downloaded.col.name": "Name",
+  "downloaded.col.version": "Version",
+  "downloaded.col.downloadedAt": "Downloaded at",
+  "downloaded.col.actions": "Actions",
+  "downloaded.action.detail": "Details",
+  "downloaded.action.redownload": "Download again",
+  "downloaded.action.remove": "Remove from history",
+  "downloaded.pagination.showing": "Show:",
+  "downloaded.pagination.totalCount": "/ Total {count}",
+  "downloaded.pagination.prev": "Previous",
+  "downloaded.pagination.next": "Next",
+  "downloaded.pagination.page": "Page {current} / {total}",
+  "downloaded.removeConfirm.title": "Remove from history",
+  "downloaded.removeConfirm.message":
+    "Remove this item from your downloaded list? The file on your device will not be deleted.",
+  "downloaded.clearConfirm.title": "Clear all history",
+  "downloaded.clearConfirm.message": "All download history will be cleared. Are you sure?",
+  "downloaded.confirm.cancel": "Cancel",
+  "downloaded.confirm.remove": "Remove",
+  "downloaded.confirm.clearAll": "Clear all",
+  "downloaded.csv.filename": "downloaded_resources",
+  "downloaded.csv.downloadedAt": "Downloaded at",
+  "favorites.breadcrumbFavorites": "Favorite resources",
+  "favorites.breadcrumbMyFavorites": "My favorites",
+  "favorites.pageTitleFavorites": "Favorite resources",
+  "favorites.pageTitleMyFavorites": "My favorites",
+  "favorites.pageDescFavorites": "Resources you marked as favorites for quick access",
+  "favorites.pageDescMyFavorites":
+    "Your favorite bookmarks (stored locally in your browser). Same data as Favorite resources under Resource management.",
+  "favorites.badgeLocal": "Local storage",
+  "favorites.count": "{count} favorites",
+  "favorites.afterFilter": "· {count} after filter",
+  "favorites.exportCsv": "Export CSV",
+  "favorites.linkFavorites": "Favorite resources",
+  "favorites.linkResourceList": "Resource list",
+  "favorites.clearAllTitle": "Remove all favorites saved in the browser",
+  "favorites.clearAllShort": "Remove all favorites",
+  "favorites.clearAllLong": "Clear all favorites",
+  "favorites.stats.total": "Total favorites",
+  "favorites.stats.thisWeek": "Added this week",
+  "favorites.stats.thisMonth": "Added this month",
+  "favorites.stats.filtered": "Filtered results",
+  "favorites.searchPlaceholder": "Search by name, version…",
+  "favorites.dateRange.all": "All time",
+  "favorites.dateRange.7d": "Last 7 days",
+  "favorites.dateRange.30d": "Last 30 days",
+  "favorites.viewTable": "Table",
+  "favorites.viewGrid": "Grid",
+  "favorites.resetFilters": "Clear filters",
+  "favorites.empty.title": "No favorite resources yet",
+  "favorites.empty.hint":
+    "Mark resources as favorites from My resources (heart icon) to see them here quickly.",
+  "favorites.empty.goResources": "Go to My resources",
+  "favorites.col.name": "Name",
+  "favorites.col.version": "Version",
+  "favorites.col.addedAt": "Added at",
+  "favorites.col.actions": "Actions",
+  "favorites.action.detail": "Details",
+  "favorites.action.download": "Download",
+  "favorites.action.unfavorite": "Remove favorite",
+  "favorites.action.deleteResource": "Delete resource",
+  "favorites.grid.download": "Download",
+  "favorites.pagination.showing": "Show:",
+  "favorites.pagination.totalCount": "/ Total {count}",
+  "favorites.pagination.prev": "Previous",
+  "favorites.pagination.next": "Next",
+  "favorites.pagination.page": "Page {current} / {total}",
+  "favorites.removeConfirm.title": "Remove from favorites",
+  "favorites.removeConfirm.message": "Remove this item from your favorites list?",
+  "favorites.deleteConfirm.title": "Delete resource",
+  "favorites.deleteConfirm.message":
+    "The resource will be deleted from the system and removed from favorites. Are you sure?",
+  "favorites.clearConfirm.title": "Remove all favorites",
+  "favorites.clearConfirm.message":
+    "All items will be removed from your locally saved favorites (does not delete your account or server data).",
+  "favorites.confirm.cancel": "Cancel",
+  "favorites.confirm.unfavorite": "Remove favorite",
+  "favorites.confirm.deleteResource": "Delete resource",
+  "favorites.confirm.clearAll": "Remove all",
+  "favorites.csv.filename": "favorite_resources",
+  "favorites.csv.addedAt": "Added at",
 };
 
 export const translations: Record<Locale, Record<TranslationKey, string>> = {
