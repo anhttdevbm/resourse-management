@@ -85,7 +85,10 @@ File: `.github/workflows/ci-cd.yml`
   - `DEPLOY_HOST`
   - `DEPLOY_USER`
   - `DEPLOY_SSH_KEY`
-  - `DEPLOY_PATH` (mặc định `/opt/resource-management`)
+- Và **Variables** (Settings → Secrets and variables → Actions → Variables):
+  - `DEPLOY_ENABLED` = `true` (bật auto-deploy)
+  - `DEPLOY_PATH` = `/opt/resourse-management` (tuỳ chọn)
+  - `DEPLOY_PORT` = `22` (tuỳ chọn)
 
 ## Lệnh thường dùng
 
