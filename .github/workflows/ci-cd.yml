@@ -28,6 +28,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r cicd/requirements/requirements.txt
 
+      - name: Prepare CI env
+        run: cp ../deploy/product.env.example .env
+
       - name: Verify app imports
         run: |
           export PYTHONPATH="${GITHUB_WORKSPACE}/back-end"
