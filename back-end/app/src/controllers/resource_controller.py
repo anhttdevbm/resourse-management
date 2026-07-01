@@ -13,6 +13,7 @@ from app.src.schemas.resource import ResourceCreate, ResourceUpdate
 from app.src.schemas.resource import ResourceGet
 from app.src.schemas.resource_share import ResourceShareCreate
 from app.src.schemas.response import ResponseObject
+from app.src.exceptions.error_code import BEErrorCode
 from app.src.services.resource_service import ResourceService
 from app.src.utils.common import row2dict
 from app.src.utils.connection.sql_connection import get_db_session
