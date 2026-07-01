@@ -179,28 +179,25 @@ const resetPassword = async (token: string, newPassword: string): Promise<boolea
     }
 };
 
+const clearLocalAuth = (): void => {
+    cookieStorage.removeItem("accessToken");
+    cookieStorage.removeItem("refreshToken");
+    cookieStorage.removeItem("user");
+    cookieStorage.removeItem("tokenType");
+    applyTheme("light");
+};
+
 const logout = async (): Promise<void> => {
+    const accessToken = cookieStorage.getItem("accessToken");
     try {
-        // Clear cookies
-        cookieStorage.removeItem("accessToken");
-        cookieStorage.removeItem("refreshToken");
-        cookieStorage.removeItem("user");
-        cookieStorage.removeItem("tokenType");
-
-        applyTheme("light");
-
-        // Optional: Call backend logout endpoint if exists
-        // await axiosInstance.post('/api/auth/logout');
-        
-        console.log('User logged out successfully');
+        if (accessToken) {
+            await axiosInstance.post('/api/auth/user/logout');
+        }
     } catch (error) {
-        console.error('Logout error:', error);
-        // Still clear cookies even if backend call fails
-        cookieStorage.removeItem("accessToken");
-        cookieStorage.removeItem("refreshToken");
-        cookieStorage.removeItem("user");
-        cookieStorage.removeItem("tokenType");
-        applyTheme("light");
+        // Token may already be expired; still clear local session
+        console.warn('Backend logout failed (local session will still be cleared):', error);
+    } finally {
+        clearLocalAuth();
     }
 };
 
