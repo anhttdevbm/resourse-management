@@ -113,7 +113,7 @@ def read_resource_by_id(
 ) -> ResponseObject:
     """Get resource by id, tôn trọng quyền share."""
     data = resource_service.get_with_permission(db_session, resource_id, user[0])
-    return ResponseObject(data=row2dict(data), code="BE0000")
+    return ResponseObject(data=_enrich_resource(data, db_session), code="BE0000")
 
 
 @resource_routers.get("/resources/")

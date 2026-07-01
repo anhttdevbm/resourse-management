@@ -1,7 +1,7 @@
 """Define resource model."""
 
 import uuid
-from sqlalchemy import TIMESTAMP, UUID, ForeignKey, String, func, BOOLEAN
+from sqlalchemy import TIMESTAMP, UUID, ForeignKey, String, func, BOOLEAN, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.src.utils.common import generate_uuid
 from .base_model import Base
@@ -24,8 +24,14 @@ class Resource(Base):
     repo_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('package_repos.id'), nullable=False)
     resource_tags = relationship("ResourceTag", secondary=resource_resource_tag, back_populates="resources")
     is_deleted: Mapped[bool] = mapped_column(BOOLEAN, default=False, nullable=False)
+    download_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     shares = relationship(
         "ResourceShare",
+        back_populates="resource",
+        cascade="all, delete-orphan",
+    )
+    download_logs = relationship(
+        "DownloadLog",
         back_populates="resource",
         cascade="all, delete-orphan",
     )

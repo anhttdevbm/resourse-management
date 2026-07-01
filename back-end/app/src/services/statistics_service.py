@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_, cast, Date, desc
 from datetime import date, datetime, timedelta
-from app.src.models import User, Resource, ResourceTag, ProductType, ResourceStatus
+from app.src.models import User, Resource, ResourceTag, ProductType, ResourceStatus, DownloadLog
 
 
 class StatisticsService:
@@ -25,10 +25,8 @@ class StatisticsService:
                 )
             ).count()
             
-            # Count total downloads - since we don't have a download tracking table,
-            # we'll use total resources as a proxy (each resource can be downloaded)
-            # In a real system, you'd track downloads separately
-            total_downloads = total_resources  # This is a placeholder - ideally should track actual downloads
+            # Count total downloads from download logs
+            total_downloads = db_session.query(func.count(DownloadLog.id)).scalar() or 0
             
             # Count files pending review
             # Look for resources with status containing "pending", "review", "kiểm duyệt", or similar
@@ -252,12 +250,13 @@ class StatisticsService:
             raise e
 
     def get_top_downloaded_resources(self, db_session: Session, limit: int = 10) -> list:
-        """Get top downloaded resources. Hiển thị name (tên tài nguyên), số lượt tải = 0 cho đến khi có bảng download_log."""
+        """Get top downloaded resources ordered by download_count."""
         try:
             top_resources = db_session.query(Resource).filter(
                 Resource.is_deleted.is_(False)
             ).order_by(
-                desc(Resource.created_at)
+                desc(Resource.download_count),
+                desc(Resource.created_at),
             ).limit(limit).all()
             
             result = []
@@ -265,14 +264,12 @@ class StatisticsService:
                 file_ext = ""
                 if resource.url and "." in resource.url:
                     file_ext = resource.url.split(".")[-1].upper()
-                # Luôn dùng resource.name (tên tài nguyên do user đặt), không dùng tên file từ url
                 display_name = (resource.name or "").strip() or "Tài nguyên"
-                # Số lượt tải: 0 cho đến khi có bảng ghi download thực (download_log)
                 result.append({
                     "id": str(resource.id),
                     "name": display_name,
                     "extension": file_ext,
-                    "downloads": 0,
+                    "downloads": resource.download_count or 0,
                     "url": resource.url or "",
                 })
             return result[:limit]
@@ -389,12 +386,7 @@ class StatisticsService:
             raise e
 
     def get_download_statistics(self, db_session: Session, period: str = "7d") -> dict:
-        """Get download statistics for a specific period.
-
-        Hiện tại hệ thống **chưa lưu log lượt tải xuống thực tế**, nên không thể đếm chính xác.
-        Để tránh gây hiểu nhầm (đang dùng số lượng tài nguyên mới tạo như lượt tải),
-        hàm này tạm thời trả về 0 và chuỗi thời gian rỗng cho đến khi có bảng download_log.
-        """
+        """Get download statistics for a specific period from download_logs."""
         try:
             end_date = datetime.now()
             if period == "1d":
@@ -410,14 +402,34 @@ class StatisticsService:
             else:
                 start_date = end_date - timedelta(days=7)
 
+            day_col = cast(DownloadLog.downloaded_at, Date).label("day")
+            rows = (
+                db_session.query(day_col, func.count(DownloadLog.id).label("cnt"))
+                .filter(
+                    DownloadLog.downloaded_at >= start_date,
+                    DownloadLog.downloaded_at <= end_date,
+                )
+                .group_by(day_col)
+                .order_by(day_col)
+                .all()
+            )
+
+            time_series = [
+                {"date": row.day.isoformat(), "downloads": row.cnt} for row in rows
+            ]
+            counts = [row.cnt for row in rows]
+            total_downloads = sum(counts)
+            average_downloads = round(total_downloads / len(counts), 2) if counts else 0.0
+            peak_downloads = max(counts) if counts else 0
+
             return {
                 "period": period,
                 "start_date": start_date.isoformat(),
                 "end_date": end_date.isoformat(),
-                "total_downloads": 0,
-                "average_downloads": 0.0,
-                "peak_downloads": 0,
-                "time_series": [],
+                "total_downloads": total_downloads,
+                "average_downloads": average_downloads,
+                "peak_downloads": peak_downloads,
+                "time_series": time_series,
             }
 
         except Exception as e:

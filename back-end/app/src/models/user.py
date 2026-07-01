@@ -43,3 +43,8 @@ class User(Base):
         back_populates="shared_with",
         cascade="all, delete-orphan",
     )
+    download_logs: Mapped[List["DownloadLog"]] = relationship(
+        "DownloadLog",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )

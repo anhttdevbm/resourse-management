@@ -14,3 +14,4 @@ from .resource_platform import ResourcePlatform
 from .notification import Notification
 from .resource_share import ResourceShare
 from .auto_classification_rule import AutoClassificationRule
+from .download_log import DownloadLog

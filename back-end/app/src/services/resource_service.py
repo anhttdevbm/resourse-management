@@ -100,6 +100,14 @@ class ResourceService:
                 print(f"✅ Name is unique: {resource_create_dict['name']}")  
             print(f"📝 Resource data: {resource_create_dict}")
 
+            if not resource_create_dict.get("status_id"):
+                pending = db_session.query(models.ResourceStatus).filter(
+                    models.ResourceStatus.name == "Pending",
+                    models.ResourceStatus.is_deleted.is_(False),
+                ).first()
+                if pending:
+                    resource_create_dict["status_id"] = pending.id
+
             # Lưu file vào local storage
             try:
                 local_full_path = os.path.join(os.getcwd(), relative_path)
@@ -174,11 +182,21 @@ class ResourceService:
         if not content:
             raise BEErrorCode.RESOURCE_NOT_FOUND.value
 
+        self._record_download(db_session, resource, user)
+
         # Ghi ra file tạm để FileResponse trả về
         file_path = os.path.join(tempfile.gettempdir(), os.path.basename(file_url))
         with open(file_path, "wb") as file:
             file.write(content)
         return file_path
+
+    def _record_download(self, db_session: Session, resource: models.Resource, user: User) -> None:
+        """Persist download log and increment resource download counter."""
+        db_session.add(
+            models.DownloadLog(resource_id=resource.id, user_id=user.id)
+        )
+        resource.download_count = (resource.download_count or 0) + 1
+        db_session.commit()
 
     def check_info(self, schema: Union[ResourceCreate, ResourceUpdate]) -> None:
         """Define check infor service."""
