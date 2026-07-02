@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import PageHeading from '../components/heading';
 import { ResourceService, type Resource, type ResourceShareInfo } from '../services/ResourceService';
-import { DownloadHistoryService } from '../services/DownloadHistoryService';
 import { useAuth } from '../contexts/AuthContext';
 import { FaArrowLeft, FaDownload, FaFile, FaCalendarAlt, FaTag, FaBox, FaFolder, FaServer, FaImage, FaShareAlt, FaTrash } from 'react-icons/fa';
 
@@ -125,12 +124,6 @@ const ResourceDetail: React.FC = () => {
 
   const handleDownload = async () => {
     if (!resource) return;
-    DownloadHistoryService.addToHistory({
-      id: resource.id,
-      name: resource.name,
-      version: resource.version,
-      url: resource.url,
-    });
     const filename =
       (resource.url && resource.url.split('/').pop()) ||
       (resource.name ? `${resource.name}.bin` : undefined);

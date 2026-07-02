@@ -49,14 +49,19 @@ const DownloadedResources: React.FC = () => {
   const [topDownloads, setTopDownloads] = useState<TopDownloadedResource[]>([]);
   const [topLoading, setTopLoading] = useState(false);
 
-  const loadHistory = () => setHistory(DownloadHistoryService.getHistory());
+  const loadHistory = async () => {
+    const items = await DownloadHistoryService.loadHistory();
+    setHistory(items);
+  };
 
   useEffect(() => {
     loadHistory();
   }, []);
 
   useEffect(() => {
-    const refresh = () => loadHistory();
+    const refresh = () => {
+      void loadHistory();
+    };
     const onStorage = (e: StorageEvent) => {
       if (e.key === DOWNLOAD_HISTORY_STORAGE_KEY || e.key === null) refresh();
     };
@@ -176,28 +181,24 @@ const DownloadedResources: React.FC = () => {
 
   const handleDownload = async (id: string) => {
     const record = history.find((r) => r.id === id);
-    if (record) {
-      DownloadHistoryService.addToHistory(record);
-      const filename =
-        (record.url && record.url.split('/').pop()) ||
-        (record.name ? `${record.name}.bin` : undefined);
-      await ResourceService.downloadResource(id, filename);
-      loadHistory();
-    } else {
-      await ResourceService.downloadResource(id);
-    }
+    const filename =
+      (record?.url && record.url.split('/').pop()) ||
+      (record?.name ? `${record.name}.bin` : undefined);
+    await ResourceService.downloadResource(id, filename);
+    await DownloadHistoryService.loadHistory();
+    await loadHistory();
   };
 
-  const handleRemove = (id: string) => {
-    DownloadHistoryService.removeFromHistory(id);
+  const handleRemove = async (id: string) => {
+    await DownloadHistoryService.removeFromHistory(id);
     setRemoveConfirm(null);
-    loadHistory();
+    await loadHistory();
   };
 
-  const handleClearAll = () => {
-    DownloadHistoryService.clearHistory();
+  const handleClearAll = async () => {
+    await DownloadHistoryService.clearHistory();
     setClearConfirm(false);
-    loadHistory();
+    await loadHistory();
   };
 
   const formatDate = useCallback(
@@ -278,11 +279,6 @@ const DownloadedResources: React.FC = () => {
                     <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-slate-50">
                       {pageTitle}
                     </h2>
-                    {isMyDownloadsRoute && (
-                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-blue-800 ring-1 ring-inset ring-blue-600/15 dark:bg-blue-950/60 dark:text-blue-200 dark:ring-blue-400/25">
-                        {t('downloaded.badgeLocal')}
-                      </span>
-                    )}
                   </div>
                   <p className="max-w-3xl text-sm leading-relaxed text-gray-600 dark:text-slate-400">
                     {pageDescription}

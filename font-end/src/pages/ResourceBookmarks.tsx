@@ -50,14 +50,19 @@ const ResourceBookmarks: React.FC = () => {
   const [noteEdit, setNoteEdit] = useState<BookmarkResourceRecord | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
 
-  const loadBookmarks = () => setBookmarks(BookmarksService.getBookmarks());
+  const loadBookmarks = async () => {
+    const items = await BookmarksService.loadBookmarks();
+    setBookmarks(items);
+  };
 
   useEffect(() => {
     loadBookmarks();
   }, []);
 
   useEffect(() => {
-    const refresh = () => loadBookmarks();
+    const refresh = () => {
+      void loadBookmarks();
+    };
     const onStorage = (e: StorageEvent) => {
       if (e.key === BOOKMARKS_STORAGE_KEY || e.key === null) refresh();
     };
@@ -172,38 +177,31 @@ const ResourceBookmarks: React.FC = () => {
       (item?.url && item.url.split('/').pop()) ||
       (item?.name ? `${item.name}.bin` : undefined);
     await ResourceService.downloadResource(id, filename);
-    if (item) {
-      DownloadHistoryService.addToHistory({
-        id: item.id,
-        name: item.name,
-        version: item.version,
-        url: item.url,
-      });
-    }
+    await DownloadHistoryService.loadHistory();
   };
 
-  const handleRemove = (id: string) => {
-    BookmarksService.removeBookmark(id);
+  const handleRemove = async (id: string) => {
+    await BookmarksService.removeBookmark(id);
     setRemoveConfirm(null);
-    loadBookmarks();
+    await loadBookmarks();
   };
 
   const handleDeleteResource = async (id: string) => {
     try {
       await ResourceService.deleteResource(id);
-      BookmarksService.removeBookmark(id);
+      await BookmarksService.removeBookmark(id);
       setDeleteConfirm(null);
-      loadBookmarks();
+      await loadBookmarks();
     } catch (err) {
       console.error('Delete resource failed:', err);
       setDeleteConfirm(null);
     }
   };
 
-  const handleClearAll = () => {
-    BookmarksService.clearBookmarks();
+  const handleClearAll = async () => {
+    await BookmarksService.clearBookmarks();
     setClearConfirm(false);
-    loadBookmarks();
+    await loadBookmarks();
   };
 
   const openNoteEdit = (item: BookmarkResourceRecord) => {
@@ -211,12 +209,12 @@ const ResourceBookmarks: React.FC = () => {
     setNoteDraft(item.note || '');
   };
 
-  const saveNote = () => {
+  const saveNote = async () => {
     if (!noteEdit) return;
-    BookmarksService.updateNote(noteEdit.id, noteDraft);
+    await BookmarksService.updateNote(noteEdit.id, noteDraft);
     setNoteEdit(null);
     setNoteDraft('');
-    loadBookmarks();
+    await loadBookmarks();
   };
 
   const formatDate = (dateString: string) => {

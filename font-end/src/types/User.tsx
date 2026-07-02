@@ -11,6 +11,7 @@ export interface UserUpdatePayload {
     email?: string;
     password?: string;
     avatar_url?: string;
+    is_locked?: boolean;
 }
 
 /** Cài đặt ứng dụng (API GET/PATCH /users/me/settings) */

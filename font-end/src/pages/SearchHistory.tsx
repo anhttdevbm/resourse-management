@@ -35,7 +35,10 @@ const SearchHistory: React.FC = () => {
 
   const navigate = useNavigate();
 
-  const loadHistory = () => setHistory(SearchHistoryService.getHistory());
+  const loadHistory = async () => {
+    const items = await SearchHistoryService.loadHistory();
+    setHistory(items);
+  };
 
   useEffect(() => {
     loadHistory();
@@ -123,16 +126,16 @@ const SearchHistory: React.FC = () => {
     navigate(`/search?q=${encodeURIComponent(query)}`);
   };
 
-  const handleRemove = (id: string) => {
-    SearchHistoryService.removeFromHistory(id);
+  const handleRemove = async (id: string) => {
+    await SearchHistoryService.removeFromHistory(id);
     setRemoveConfirm(null);
-    loadHistory();
+    await loadHistory();
   };
 
-  const handleClearAll = () => {
-    SearchHistoryService.clearHistory();
+  const handleClearAll = async () => {
+    await SearchHistoryService.clearHistory();
     setClearConfirm(false);
-    loadHistory();
+    await loadHistory();
   };
 
   const formatDate = (dateString: string) => {

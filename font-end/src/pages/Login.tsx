@@ -87,6 +87,8 @@ const Login = () => {
         const errorMessage = urlParams.get('message');
         if (error === 'twitter_login_failed') {
             dispatch(setToast({ message: `Đăng nhập Twitter thất bại: ${errorMessage}`, type: "error" }));
+        } else if (error === 'account_locked') {
+            dispatch(setToast({ message: 'Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.', type: "error" }));
         } else if (error === 'google_login_failed') {
             dispatch(setToast({ message: `Đăng nhập Google thất bại: ${errorMessage}`, type: "error" }));
         } else if (error === 'github_login_failed') {

@@ -26,6 +26,7 @@ from app.src.controllers.system_info_controller import system_info_routers
 from app.src.controllers.statistics_controller import statistics_routers
 from app.src.controllers.notification_controller import notification_router
 from app.src.controllers.auto_classification_rule_controller import auto_classification_routers
+from app.src.controllers.user_activity_controller import user_activity_router
 from app.src.exceptions.exception import BusinessException
 from app.src.exceptions.exception_handler import business_exception_handler
 
@@ -93,3 +94,4 @@ app.include_router(system_info_routers, tags=["System Info"], prefix=PREFIX)
 app.include_router(statistics_routers, tags=["Statistics"], prefix=PREFIX)
 app.include_router(notification_router, tags=["Notification"], prefix=PREFIX)
 app.include_router(auto_classification_routers, tags=["Auto Classification"], prefix=PREFIX)
+app.include_router(user_activity_router, tags=["User Activity"], prefix=PREFIX)

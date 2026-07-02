@@ -20,6 +20,8 @@ import {
   FaKey,
   FaEye,
   FaPlus,
+  FaLock,
+  FaUnlock,
 } from 'react-icons/fa';
 
 type RoleFilter = 'all' | 'admin' | 'user';
@@ -63,6 +65,7 @@ const AdminUsers: React.FC = () => {
 
   const [deleteTarget, setDeleteTarget] = useState<AdminUserRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [lockBusyId, setLockBusyId] = useState<string | null>(null);
 
   const breadcrumb = useMemo(
     () => ({ title: 'Quản lý người dùng', route: '/admin/users' }),
@@ -199,6 +202,23 @@ const AdminUsers: React.FC = () => {
       setDeleteTarget(null);
       if (users.length === 1 && page > 1) setPage((p) => p - 1);
       else loadUsers();
+    }
+  };
+
+  const handleToggleLock = async (u: AdminUserRecord) => {
+    if (u.id === currentUser?.id) {
+      toast.error('Không thể khóa tài khoản đang đăng nhập.');
+      return;
+    }
+    setLockBusyId(u.id);
+    const updated = await AdminUserService.updateUser(u.id, { is_locked: !u.is_locked });
+    setLockBusyId(null);
+    if (updated) {
+      toast.success(updated.is_locked ? 'Đã khóa tài khoản.' : 'Đã mở khóa tài khoản.');
+      loadUsers();
+      if (detailUser?.id === u.id) {
+        setDetailUser(updated);
+      }
     }
   };
 
@@ -423,17 +443,25 @@ const AdminUsers: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{u.email}</td>
                       <td className="px-4 py-3">
-                        {u.is_admin ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">
-                            <FaShieldAlt className="w-3 h-3" />
-                            Admin
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
-                            <FaUser className="w-3 h-3" />
-                            User
-                          </span>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1">
+                          {u.is_admin ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">
+                              <FaShieldAlt className="w-3 h-3" />
+                              Admin
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
+                              <FaUser className="w-3 h-3" />
+                              User
+                            </span>
+                          )}
+                          {u.is_locked && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-800 dark:bg-slate-700 dark:text-slate-200">
+                              <FaLock className="w-3 h-3" />
+                              Đã khóa
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-slate-400 whitespace-nowrap">
                         {formatDate(u.created_at)}
@@ -456,6 +484,19 @@ const AdminUsers: React.FC = () => {
                             className="p-2 rounded-lg text-gray-600 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-slate-800"
                           >
                             <FaShieldAlt className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            title={u.is_locked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
+                            onClick={() => handleToggleLock(u)}
+                            disabled={lockBusyId === u.id || u.id === currentUser?.id}
+                            className={`p-2 rounded-lg dark:hover:bg-slate-800 disabled:opacity-40 ${
+                              u.is_locked
+                                ? 'text-amber-600 hover:bg-amber-50'
+                                : 'text-gray-600 hover:bg-gray-100'
+                            }`}
+                          >
+                            {u.is_locked ? <FaUnlock className="w-4 h-4" /> : <FaLock className="w-4 h-4" />}
                           </button>
                           <button
                             type="button"

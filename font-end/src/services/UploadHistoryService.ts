@@ -1,75 +1,70 @@
 /**
- * Upload history - lưu lịch sử tài nguyên đã upload (localStorage).
- * Khi user upload tài nguyên thành công, ghi vào đây để hiển thị tại "Lịch sử upload".
+ * Upload history — đọc từ resources của user qua API.
  */
+import axiosInstance from '../configs/axios';
 
-const STORAGE_KEY = 'resource_upload_history';
+const LEGACY_STORAGE_KEY = 'resource_upload_history';
 
 export interface UploadedResourceRecord {
   id: string;
   name: string;
   version: string;
   url?: string;
-  uploaded_at: string; // ISO string
+  uploaded_at: string;
 }
 
-function getStorage(): UploadedResourceRecord[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
+let cache: UploadedResourceRecord[] = [];
 
-function setStorage(items: UploadedResourceRecord[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-  } catch (e) {
-    console.warn('UploadHistoryService: setStorage failed', e);
-  }
-}
-
-/** Thêm một bản ghi đã upload (gọi khi upload thành công). */
-export function addToHistory(record: Omit<UploadedResourceRecord, 'uploaded_at'>) {
-  const list = getStorage();
-  const existing = list.find((r) => r.id === record.id);
-  const newRecord: UploadedResourceRecord = {
-    ...record,
-    uploaded_at: new Date().toISOString(),
-  };
-  if (existing) {
-    const rest = list.filter((r) => r.id !== record.id);
-    setStorage([newRecord, ...rest]);
-  } else {
-    setStorage([newRecord, ...list]);
-  }
-}
-
-/** Lấy toàn bộ lịch sử upload (mới nhất trước). */
-export function getHistory(): UploadedResourceRecord[] {
-  const list = getStorage();
-  return list.sort(
+function sortHistory(items: UploadedResourceRecord[]): UploadedResourceRecord[] {
+  return [...items].sort(
     (a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
   );
 }
 
-/** Xóa một bản ghi theo id. */
-export function removeFromHistory(id: string) {
-  setStorage(getStorage().filter((r) => r.id !== id));
+export async function loadHistory(): Promise<UploadedResourceRecord[]> {
+  try {
+    const response = await axiosInstance.get('/resource-management/users/me/upload-history');
+    cache = sortHistory((response.data?.data?.items as UploadedResourceRecord[]) ?? []);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    return cache;
+  } catch {
+    try {
+      const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        cache = sortHistory(Array.isArray(parsed) ? parsed : []);
+        return cache;
+      }
+    } catch {
+      // ignore
+    }
+    cache = [];
+    return cache;
+  }
 }
 
-/** Xóa toàn bộ lịch sử. */
-export function clearHistory() {
-  setStorage([]);
+/** Upload thành công — refresh từ API thay vì localStorage. */
+export async function addToHistory(_record: Omit<UploadedResourceRecord, 'uploaded_at'>) {
+  await loadHistory();
+}
+
+export function getHistory(): UploadedResourceRecord[] {
+  return sortHistory(cache);
+}
+
+export async function removeFromHistory(id: string) {
+  cache = cache.filter((r) => r.id !== id);
+}
+
+export async function clearHistory() {
+  cache = [];
+  localStorage.removeItem(LEGACY_STORAGE_KEY);
 }
 
 export const UploadHistoryService = {
+  loadHistory,
   addToHistory,
   getHistory,
   removeFromHistory,
   clearHistory,
 };
-

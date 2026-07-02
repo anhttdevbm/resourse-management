@@ -35,7 +35,10 @@ const UploadHistory: React.FC = () => {
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null);
   const [clearConfirm, setClearConfirm] = useState(false);
 
-  const loadHistory = () => setHistory(UploadHistoryService.getHistory());
+  const loadHistory = async () => {
+    const items = await UploadHistoryService.loadHistory();
+    setHistory(items);
+  };
 
   useEffect(() => {
     loadHistory();
@@ -128,16 +131,16 @@ const UploadHistory: React.FC = () => {
     window.open(`/resources/${id}`, '_blank');
   };
 
-  const handleRemove = (id: string) => {
-    UploadHistoryService.removeFromHistory(id);
+  const handleRemove = async (id: string) => {
+    await UploadHistoryService.removeFromHistory(id);
     setRemoveConfirm(null);
-    loadHistory();
+    await loadHistory();
   };
 
-  const handleClearAll = () => {
-    UploadHistoryService.clearHistory();
+  const handleClearAll = async () => {
+    await UploadHistoryService.clearHistory();
     setClearConfirm(false);
-    loadHistory();
+    await loadHistory();
   };
 
   const formatDate = (dateString: string) => {

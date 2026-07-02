@@ -27,6 +27,7 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = None
     avatar_url: Optional[str] = None
+    is_locked: Optional[bool] = None
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr

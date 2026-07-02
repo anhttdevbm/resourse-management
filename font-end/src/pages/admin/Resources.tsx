@@ -13,7 +13,6 @@ import {
   ResourceUploadOptions,
   ResourceShareInfo,
 } from '../../services/ResourceService';
-import { DownloadHistoryService } from '../../services/DownloadHistoryService';
 import {
   FaSearch,
   FaTimes,
@@ -410,12 +409,6 @@ const AdminResources: React.FC = () => {
   };
 
   const handleDownload = async (resource: AdminResource) => {
-    DownloadHistoryService.addToHistory({
-      id: resource.id,
-      name: resource.name,
-      version: resource.version,
-      url: resource.url,
-    });
     const filename =
       (resource.url && resource.url.split('/').pop()) ||
       (resource.name ? `${resource.name}.bin` : undefined);

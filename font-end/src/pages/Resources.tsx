@@ -61,12 +61,17 @@ const Resources: React.FC = () => {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [showFilters, setShowFilters] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(
-    () => new Set(FavoritesService.getFavorites().map((r) => r.id))
-  );
-  const [bookmarkIds, setBookmarkIds] = useState<Set<string>>(
-    () => new Set(BookmarksService.getBookmarks().map((r) => r.id))
-  );
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [bookmarkIds, setBookmarkIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const loadUserActivity = async () => {
+      await Promise.all([FavoritesService.loadFavorites(), BookmarksService.loadBookmarks()]);
+      setFavoriteIds(new Set(FavoritesService.getFavorites().map((r) => r.id)));
+      setBookmarkIds(new Set(BookmarksService.getBookmarks().map((r) => r.id)));
+    };
+    loadUserActivity();
+  }, []);
 
   const fetchResources = useCallback(async () => {
     setLoading(true);
@@ -188,20 +193,15 @@ const Resources: React.FC = () => {
 
   // Handle download - ghi vào lịch sử đã tải để hiển thị tại /resources/downloaded
   const handleDownload = async (resource: Resource) => {
-    DownloadHistoryService.addToHistory({
-      id: resource.id,
-      name: resource.name,
-      version: resource.version,
-      url: resource.url,
-    });
     const filename =
       (resource.url && resource.url.split('/').pop()) ||
       (resource.name ? `${resource.name}.bin` : undefined);
     await ResourceService.downloadResource(resource.id, filename);
+    await DownloadHistoryService.loadHistory();
   };
 
-  const handleToggleFavorite = (resource: Resource) => {
-    FavoritesService.toggleFavorite({
+  const handleToggleFavorite = async (resource: Resource) => {
+    await FavoritesService.toggleFavorite({
       id: resource.id,
       name: resource.name,
       version: resource.version,
@@ -210,8 +210,8 @@ const Resources: React.FC = () => {
     setFavoriteIds(new Set(FavoritesService.getFavorites().map((r) => r.id)));
   };
 
-  const handleToggleBookmark = (resource: Resource) => {
-    BookmarksService.toggleBookmark({
+  const handleToggleBookmark = async (resource: Resource) => {
+    await BookmarksService.toggleBookmark({
       id: resource.id,
       name: resource.name,
       version: resource.version,

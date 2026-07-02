@@ -29,6 +29,7 @@ class User(Base):
         cascade="all, delete-orphan",
     )
     is_deleted: Mapped[bool] = mapped_column(BOOLEAN, default=False, nullable=False)
+    is_locked: Mapped[bool] = mapped_column(BOOLEAN, default=False, server_default="false", nullable=False)
     reset_token = Column(String, nullable=True)
     reset_token_expires = Column(DateTime, nullable=True)
     facebook_id = Column(String, unique=True, index=True, nullable=True)
@@ -45,6 +46,21 @@ class User(Base):
     )
     download_logs: Mapped[List["DownloadLog"]] = relationship(
         "DownloadLog",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    favorites: Mapped[List["UserFavorite"]] = relationship(
+        "UserFavorite",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    bookmarks: Mapped[List["UserBookmark"]] = relationship(
+        "UserBookmark",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    search_history: Mapped[List["SearchHistory"]] = relationship(
+        "SearchHistory",
         back_populates="user",
         cascade="all, delete-orphan",
     )

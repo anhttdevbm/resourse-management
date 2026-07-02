@@ -49,14 +49,19 @@ const ResourceFavorites: React.FC = () => {
   const [clearConfirm, setClearConfirm] = useState(false);
   const [dateRange, setDateRange] = useState<DateRangeFilter>('all');
 
-  const loadFavorites = () => setFavorites(FavoritesService.getFavorites());
+  const loadFavorites = async () => {
+    const items = await FavoritesService.loadFavorites();
+    setFavorites(items);
+  };
 
   useEffect(() => {
     loadFavorites();
   }, []);
 
   useEffect(() => {
-    const refresh = () => loadFavorites();
+    const refresh = () => {
+      void loadFavorites();
+    };
     const onStorage = (e: StorageEvent) => {
       if (e.key === FAVORITES_STORAGE_KEY || e.key === null) refresh();
     };
@@ -160,38 +165,31 @@ const ResourceFavorites: React.FC = () => {
       (fav?.url && fav.url.split('/').pop()) ||
       (fav?.name ? `${fav.name}.bin` : undefined);
     await ResourceService.downloadResource(id, filename);
-    if (fav) {
-      DownloadHistoryService.addToHistory({
-        id: fav.id,
-        name: fav.name,
-        version: fav.version,
-        url: fav.url,
-      });
-    }
+    await DownloadHistoryService.loadHistory();
   };
 
-  const handleRemove = (id: string) => {
-    FavoritesService.removeFromFavorites(id);
+  const handleRemove = async (id: string) => {
+    await FavoritesService.removeFromFavorites(id);
     setRemoveConfirm(null);
-    loadFavorites();
+    await loadFavorites();
   };
 
   const handleDeleteResource = async (id: string) => {
     try {
       await ResourceService.deleteResource(id);
-      FavoritesService.removeFromFavorites(id);
+      await FavoritesService.removeFromFavorites(id);
       setDeleteConfirm(null);
-      loadFavorites();
+      await loadFavorites();
     } catch (err) {
       console.error('Delete resource failed:', err);
       setDeleteConfirm(null);
     }
   };
 
-  const handleClearAll = () => {
-    FavoritesService.clearFavorites();
+  const handleClearAll = async () => {
+    await FavoritesService.clearFavorites();
     setClearConfirm(false);
-    loadFavorites();
+    await loadFavorites();
   };
 
   const formatDate = useCallback(
@@ -268,11 +266,6 @@ const ResourceFavorites: React.FC = () => {
                   <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-slate-50">
                     {pageTitle}
                   </h2>
-                  {isMyFavoritesRoute && (
-                    <span className="inline-flex items-center rounded-full bg-pink-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-pink-800 ring-1 ring-inset ring-pink-600/20 dark:bg-pink-950/40 dark:text-pink-200 dark:ring-pink-400/25">
-                      {t('favorites.badgeLocal')}
-                    </span>
-                  )}
                 </div>
                 <p className="max-w-3xl text-sm leading-relaxed text-gray-600 dark:text-slate-400">
                   {pageDescription}

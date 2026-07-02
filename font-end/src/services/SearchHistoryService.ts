@@ -1,28 +1,29 @@
 /**
- * Lịch sử tìm kiếm — lưu localStorage (giống UploadHistory).
- * Ghi khi người dùng tìm từ trang Tìm kiếm hoặc modal.
+ * Lịch sử tìm kiếm — lưu qua API (thay localStorage).
  */
+import axiosInstance from '../configs/axios';
 
-const STORAGE_KEY = 'resource_search_history';
-const MAX_ITEMS = 200;
+const LEGACY_STORAGE_KEY = 'resource_search_history';
 
 export interface SearchHistoryRecord {
-  /** Khóa chuẩn hóa (trùng từ khóa → cập nhật bản ghi mới nhất) */
   id: string;
-  /** Từ khóa hiển thị (lần gần nhất) */
   query: string;
   resource_count: number;
   user_count: number;
   searched_at: string;
 }
 
-function normalizeQuery(q: string): string {
-  return q.trim().toLowerCase().replace(/\s+/g, ' ');
+let cache: SearchHistoryRecord[] = [];
+
+function sortHistory(items: SearchHistoryRecord[]): SearchHistoryRecord[] {
+  return [...items].sort(
+    (a, b) => new Date(b.searched_at).getTime() - new Date(a.searched_at).getTime()
+  );
 }
 
-function getStorage(): SearchHistoryRecord[] {
+function readLegacy(): SearchHistoryRecord[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -31,51 +32,100 @@ function getStorage(): SearchHistoryRecord[] {
   }
 }
 
-function setStorage(items: SearchHistoryRecord[]) {
+async function migrateLegacyFromLocalStorage(): Promise<void> {
+  const legacy = readLegacy();
+  if (!legacy.length) return;
+  for (const item of legacy) {
+    try {
+      await axiosInstance.post('/resource-management/users/me/search-history', {
+        query: item.query,
+        resource_count: item.resource_count,
+        user_count: item.user_count,
+      });
+    } catch {
+      // skip
+    }
+  }
+  localStorage.removeItem(LEGACY_STORAGE_KEY);
+}
+
+export async function loadHistory(): Promise<SearchHistoryRecord[]> {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, MAX_ITEMS)));
-  } catch (e) {
-    console.warn('SearchHistoryService: setStorage failed', e);
+    const response = await axiosInstance.get('/resource-management/users/me/search-history');
+    const items = (response.data?.data?.items as SearchHistoryRecord[]) ?? [];
+    if (!items.length && readLegacy().length) {
+      await migrateLegacyFromLocalStorage();
+      const retry = await axiosInstance.get('/resource-management/users/me/search-history');
+      cache = sortHistory((retry.data?.data?.items as SearchHistoryRecord[]) ?? []);
+    } else {
+      cache = sortHistory(items);
+    }
+    return cache;
+  } catch {
+    cache = sortHistory(readLegacy());
+    return cache;
   }
 }
 
-/** Thêm / cập nhật một lần tìm (cùng từ khóa → đưa lên đầu, cập nhật số liệu). */
-export function addToHistory(entry: {
+export async function addToHistory(entry: {
   query: string;
   resource_count: number;
   user_count: number;
 }) {
   const q = entry.query.trim();
   if (q.length < 2) return;
-
-  const id = normalizeQuery(q);
-  const list = getStorage().filter((r) => r.id !== id);
-  const newRecord: SearchHistoryRecord = {
-    id,
-    query: q,
-    resource_count: entry.resource_count,
-    user_count: entry.user_count,
-    searched_at: new Date().toISOString(),
-  };
-  setStorage([newRecord, ...list]);
+  try {
+    const response = await axiosInstance.post('/resource-management/users/me/search-history', {
+      query: q,
+      resource_count: entry.resource_count,
+      user_count: entry.user_count,
+    });
+    const item = response.data?.data as SearchHistoryRecord;
+    if (item?.id) {
+      cache = sortHistory([item, ...cache.filter((r) => r.id !== item.id)]);
+      return;
+    }
+  } catch {
+    // fallback
+  }
+  const id = q.toLowerCase().replace(/\s+/g, ' ');
+  cache = sortHistory([
+    {
+      id,
+      query: q,
+      resource_count: entry.resource_count,
+      user_count: entry.user_count,
+      searched_at: new Date().toISOString(),
+    },
+    ...cache.filter((r) => r.id !== id),
+  ]);
 }
 
 export function getHistory(): SearchHistoryRecord[] {
-  const list = getStorage();
-  return list.sort(
-    (a, b) => new Date(b.searched_at).getTime() - new Date(a.searched_at).getTime()
-  );
+  return sortHistory(cache);
 }
 
-export function removeFromHistory(id: string) {
-  setStorage(getStorage().filter((r) => r.id !== id));
+export async function removeFromHistory(id: string) {
+  try {
+    await axiosInstance.delete(`/resource-management/users/me/search-history/${encodeURIComponent(id)}`);
+  } catch {
+    // ignore
+  }
+  cache = cache.filter((r) => r.id !== id);
 }
 
-export function clearHistory() {
-  setStorage([]);
+export async function clearHistory() {
+  try {
+    await axiosInstance.delete('/resource-management/users/me/search-history');
+  } catch {
+    // ignore
+  }
+  cache = [];
+  localStorage.removeItem(LEGACY_STORAGE_KEY);
 }
 
 export const SearchHistoryService = {
+  loadHistory,
   addToHistory,
   getHistory,
   removeFromHistory,

@@ -67,7 +67,12 @@ class UserService(object):
             "permissions": perms,
             "is_admin": is_admin,
             "has_password": bool(user.password),
+            "is_locked": bool(getattr(user, "is_locked", False)),
         }
+
+    def _ensure_user_not_locked(self, user: Optional[models.User]) -> None:
+        if user and getattr(user, "is_locked", False):
+            raise AuthErrorCode.ACCOUNT_LOCKED.value
 
     def get_user_by_access_token(self, db_session: Session, token: str) -> Union[models.User]:
         """Define get user system by access token."""
@@ -77,6 +82,7 @@ class UserService(object):
         token_data = TokenPayload(**payload)
         user = self.user_repository.get_user_by_email(db_session, token_data.sub)
         if user:
+            self._ensure_user_not_locked(user)
             return user
 
     def get_current_user(
@@ -98,6 +104,7 @@ class UserService(object):
         user = self.user_repository.get_user_by_email(db_session, email)
         if not user:
             raise AuthErrorCode.USERNAME_NOT_FOUND.value
+        self._ensure_user_not_locked(user)
         if not verify_password(password, str(user.password)):
             raise AuthErrorCode.INCORRECT_PASSWORD.value
         return user

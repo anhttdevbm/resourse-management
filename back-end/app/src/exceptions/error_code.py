@@ -96,4 +96,5 @@ class AuthErrorCode(Enum):
     EXPIRED_REFRESH_TOKEN = BusinessException(ExceptionDetail(message="Expired Refresh Token", code="AUTH0014"))
     INVALID_TOKEN = BusinessException(ExceptionDetail(message="Invalid Token", code="AUTH0015"))
     EMAIL_EXISTED = BusinessException(ExceptionDetail(message="Email Has Been Used", code="AUTH0016"))
+    ACCOUNT_LOCKED = BusinessException(ExceptionDetail(message="Account is locked", code="AUTH0017"))
 

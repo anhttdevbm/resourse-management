@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHeading from '../components/heading';
 import { ResourceService, type Resource } from '../services/ResourceService';
-import { DownloadHistoryService } from '../services/DownloadHistoryService';
 import { FaDownload, FaFile, FaSearch, FaSort, FaSortDown, FaSortUp, FaTimes } from 'react-icons/fa';
 
 type SortField = 'name' | 'version' | 'created_at';
@@ -118,12 +117,6 @@ const OtherFiles: React.FC = () => {
   };
 
   const handleDownload = async (resource: Resource) => {
-    DownloadHistoryService.addToHistory({
-      id: resource.id,
-      name: resource.name,
-      version: resource.version,
-      url: resource.url,
-    });
     const filename =
       (resource.url && resource.url.split('/').pop()) ||
       (resource.name ? `${resource.name}.bin` : undefined);

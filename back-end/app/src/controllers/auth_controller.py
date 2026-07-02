@@ -50,6 +50,13 @@ def _oauth_redirect_target(request: Request) -> str:
     return f"{_public_url()}/login"
 
 
+def _redirect_account_locked() -> RedirectResponse:
+    return RedirectResponse(
+        url=f"{_public_url()}/login?error=account_locked&message=Account%20is%20locked",
+        status_code=302,
+    )
+
+
 class PasswordResetRequest(BaseModel):
     email: EmailStr
 
@@ -116,6 +123,8 @@ async def facebook_callback(request: Request):
 
     db = next(get_db())
     user = await user_repository.get_or_create_user_by_facebook(fb_user, db)
+    if getattr(user, "is_locked", False):
+        return _redirect_account_locked()
 
     token_data = auth_service.login(user.email)
 
@@ -141,16 +150,20 @@ def generate_code_challenge(verifier: str) -> str:
 
 @auth_routers.get("/login/twitter")
 async def login_twitter():
-    # Twitter OAuth2 có thể sử dụng plain method đơn giản hơn
-    state = secrets.token_hex(16)
-    
+    state = secrets.token_urlsafe(16)
+    code_verifier = secrets.token_urlsafe(64)
+    code_challenge = generate_code_challenge(code_verifier)
+    verifier_store[state] = code_verifier
+
     url = (
         f"https://twitter.com/i/oauth2/authorize"
         f"?response_type=code"
         f"&client_id={config('TWITTER_CLIENT_ID')}"
         f"&redirect_uri={config('TWITTER_REDIRECT_URI')}"
-        f"&scope=users.read"
+        f"&scope=tweet.read%20users.read"
         f"&state={state}"
+        f"&code_challenge={code_challenge}"
+        f"&code_challenge_method=S256"
     )
     return RedirectResponse(url)
 
@@ -159,42 +172,37 @@ async def twitter_callback(request: Request):
     try:
         code = request.query_params.get("code")
         state = request.query_params.get("state")
-        
-        print(f"Twitter callback - Code: {code}, State: {state}")
-        
+
         if not code:
             raise HTTPException(status_code=400, detail="Missing code")
-        
-        # Get Twitter access token
-        token = await get_twitter_access_token(code)
-        print(f"Twitter access token received: {token[:10]}..." if token else "No token")
-        
-        # Get Twitter user info
-        twitter_user = await get_twitter_user_info(token)
-        print(f"Twitter user info: {twitter_user}")
+        if not state:
+            raise HTTPException(status_code=400, detail="Missing state")
 
-        # Create or get user from database
+        code_verifier = verifier_store.pop(state, None)
+        if not code_verifier:
+            raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
+
+        token = await get_twitter_access_token(code, code_verifier)
+        twitter_user = await get_twitter_user_info(token)
+
         db = next(get_db())
         user = await user_repository.get_or_create_user_by_twitter(twitter_user, db)
-        print(f"User created/found: {user.id}")
+        if getattr(user, "is_locked", False):
+            return _redirect_account_locked()
 
-        # Generate JWT tokens
         token_data = auth_service.login(user.email)
 
         frontend_url = _oauth_redirect_target(request)
         redirect_url = f"{frontend_url}?access_token={token_data['access_token']}&refresh_token={token_data.get('refresh_token', '')}&login_type=twitter"
-        print(f"Redirecting to: {redirect_url}")
-        
         return RedirectResponse(url=redirect_url, status_code=302)
-        
+
     except Exception as e:
         print(f"Twitter callback error: {str(e)}")
         import traceback
         traceback.print_exc()
-        
-        # Redirect to frontend with error
+
         frontend_url = f"{_public_url()}/login"
-        error_message = str(e).replace(' ', '%20')  # URL encode spaces
+        error_message = str(e).replace(' ', '%20')
         redirect_url = f"{frontend_url}?error=twitter_login_failed&message={error_message}"
         return RedirectResponse(url=redirect_url, status_code=302)
 
@@ -225,6 +233,8 @@ async def google_callback(request: Request):
 
         db = next(get_db())
         user = await user_repository.get_or_create_user_by_google(google_user, db)
+        if getattr(user, "is_locked", False):
+            return _redirect_account_locked()
 
         token_data = auth_service.login(user.email)
 
@@ -263,9 +273,9 @@ async def github_callback(request: Request, db: Session = Depends(get_db)):
 
         # Create or get user from database
         user = await user_repository.get_or_create_user_by_github(github_user, db)
-        print(f"User created/found: {user.id}")
+        if getattr(user, "is_locked", False):
+            return _redirect_account_locked()
 
-        # Generate JWT tokens
         token_data = auth_service.login(user.email)
 
         frontend_url = _oauth_redirect_target(request)

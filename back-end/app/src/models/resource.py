@@ -35,3 +35,13 @@ class Resource(Base):
         back_populates="resource",
         cascade="all, delete-orphan",
     )
+    favorited_by = relationship(
+        "UserFavorite",
+        back_populates="resource",
+        cascade="all, delete-orphan",
+    )
+    bookmarked_by = relationship(
+        "UserBookmark",
+        back_populates="resource",
+        cascade="all, delete-orphan",
+    )

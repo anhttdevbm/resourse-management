@@ -12,6 +12,7 @@ export type AdminUserRecord = {
   permissions: string[];
   is_admin: boolean;
   has_password: boolean;
+  is_locked?: boolean;
 };
 
 export type AdminUsersPage = {
