@@ -21,7 +21,6 @@ from app.src.utils.security import jwt_create_token
 from app.src.models.user import User
 from app.core.database import get_db
 from app.src.utils.twitter import get_twitter_access_token, get_twitter_user_info
-from app.src.utils.state_memory import verifier_store
 from fastapi.responses import RedirectResponse
 import hashlib
 from app.src.utils.google import get_google_access_token, get_google_user_info
@@ -149,11 +148,14 @@ def generate_code_challenge(verifier: str) -> str:
     return base64.urlsafe_b64encode(sha256).rstrip(b'=').decode('utf-8')
 
 @auth_routers.get("/login/twitter")
-async def login_twitter():
+async def login_twitter(request: Request):
     state = secrets.token_urlsafe(16)
     code_verifier = secrets.token_urlsafe(64)
     code_challenge = generate_code_challenge(code_verifier)
-    verifier_store[state] = code_verifier
+    request.session["twitter_oauth"] = {
+        "state": state,
+        "code_verifier": code_verifier,
+    }
 
     url = (
         f"https://twitter.com/i/oauth2/authorize"
@@ -178,10 +180,11 @@ async def twitter_callback(request: Request):
         if not state:
             raise HTTPException(status_code=400, detail="Missing state")
 
-        code_verifier = verifier_store.pop(state, None)
-        if not code_verifier:
+        oauth_session = request.session.pop("twitter_oauth", None)
+        if not oauth_session or oauth_session.get("state") != state:
             raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
 
+        code_verifier = oauth_session["code_verifier"]
         token = await get_twitter_access_token(code, code_verifier)
         twitter_user = await get_twitter_user_info(token)
 
