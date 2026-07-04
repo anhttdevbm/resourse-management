@@ -160,7 +160,7 @@ async def login_twitter():
         f"?response_type=code"
         f"&client_id={config('TWITTER_CLIENT_ID')}"
         f"&redirect_uri={config('TWITTER_REDIRECT_URI')}"
-        f"&scope=tweet.read%20users.read"
+        f"&scope=tweet.read%20users.read%20users.email%20offline.access"
         f"&state={state}"
         f"&code_challenge={code_challenge}"
         f"&code_challenge_method=S256"

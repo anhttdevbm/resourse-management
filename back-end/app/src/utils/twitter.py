@@ -69,7 +69,7 @@ async def get_twitter_user_info(access_token: str) -> dict:
     async with httpx.AsyncClient() as client:
         response = await client.get(
             "https://api.twitter.com/2/users/me",
-            params={"user.fields": "id,name,username,profile_image_url"},
+            params={"user.fields": "id,name,username,profile_image_url,email"},
             headers={"Authorization": f"Bearer {access_token}"},
         )
         if response.is_error:

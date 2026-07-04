@@ -89,12 +89,17 @@ class UserRepository(BaseSQLRepository[models.User]):
     async def get_user_by_twitter_id(self, db: Session, twitter_id: str) -> User:
         return db.query(User).filter(User.twitter_id == twitter_id).first()
 
+    @staticmethod
+    def _twitter_placeholder_email(twitter_id: str) -> str:
+        return f"{twitter_id}@twitter.oauth"
+
     async def create_user_from_twitter(self, db: Session, user_data: dict) -> User:
         user = User(
             twitter_id=user_data["id"],
             name=user_data["name"],
-            email=user_data.get("email"),
-            password=None
+            email=user_data.get("email") or self._twitter_placeholder_email(user_data["id"]),
+            password=None,
+            avatar_url=user_data.get("profile_image_url"),
         )
         db.add(user)
         db.commit()
