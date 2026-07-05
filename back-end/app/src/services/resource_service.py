@@ -28,6 +28,34 @@ def _user_has_admin_access(db_session: Session, user: User) -> bool:
     return user_service._has_admin_access(db_session, user)
 
 
+MANAGE_RESOURCES_PERMISSION = "manage_resources"
+
+
+def _resource_update_payload(resource_update: ResourceUpdate) -> dict:
+    """Chỉ gửi field client thực sự set; bỏ None và placeholder 'string'."""
+    update_data = {}
+    for key, value in resource_update.dict(exclude_unset=True).items():
+        if value is not None and value != "string":
+            update_data[key] = value
+    return update_data
+
+
+def _user_has_manage_resources(db_session: Session, user: User) -> bool:
+    """Admin hoặc permission manage_resources (khớp UI Auto Classification)."""
+    if _user_has_admin_access(db_session, user):
+        return True
+    u = user_service._user_with_permissions(db_session, user.id)
+    if not u:
+        return False
+    return any(p.name == MANAGE_RESOURCES_PERMISSION for p in u.permissions)
+
+
+def _user_can_update_resource(db_session: Session, resource: models.Resource, user: User) -> bool:
+    if str(resource.user_id) == str(user.id):
+        return True
+    return _user_has_manage_resources(db_session, user)
+
+
 class ResourceService:
     """Define resource service."""
 
@@ -352,10 +380,7 @@ class ResourceService:
             if not deleted:
                 raise BEErrorCode.RESOURCE_NOT_FOUND.value
             resource = deleted
-        update_data = {}
-        for key, value in resource_update.dict(exclude_unset=True).items():
-            if value is not None and value != "string":
-                update_data[key] = value
+        update_data = _resource_update_payload(resource_update)
         if update_data:
             self.file_repository.update(db_session, obj_id=resource_id, obj_in=update_data)
         resource = self.file_repository.get(db_session, resource_id)
@@ -384,19 +409,22 @@ class ResourceService:
         self.file_repository.back_up(db_session, obj_id=resource.id)
         return self.file_repository.get(db_session, resource_id)
 
-    def update(self, db_session: Session, resource_id: int, resource_update: ResourceUpdate, user) -> models.Resource:
-        """Update an existing resource."""
+    def update(
+        self,
+        db_session: Session,
+        resource_id: Union[str, uuid.UUID],
+        resource_update: ResourceUpdate,
+        user: User,
+    ) -> models.Resource:
+        """Update resource: owner, hoặc user có manage_resources / admin."""
         resource = self.file_repository.get(db_session, resource_id)
-        user_id = str(user.id)
-        if resource.user_id == user_id:
-            if self.file_repository.get(db_session, resource_id) is None:
-                raise BEErrorCode.RESOURCE_NOT_FOUND.value
-            update_data = {}
-            for key, value in resource_update.dict().items():
-                if value != 'string':
-                    update_data[key] = value
-            if update_data:
-                _ = self.file_repository.update(db_session, obj_id=resource_id, obj_in=update_data)
+        if not resource:
+            raise BEErrorCode.RESOURCE_NOT_FOUND.value
+        if not _user_can_update_resource(db_session, resource, user):
+            raise BEErrorCode.USER_NOT_PERMISSION.value
+        update_data = _resource_update_payload(resource_update)
+        if update_data:
+            self.file_repository.update(db_session, obj_id=resource_id, obj_in=update_data)
         resource = self.file_repository.get(db_session, resource_id)
         if not resource:
             raise BEErrorCode.RESOURCE_NOT_FOUND.value
