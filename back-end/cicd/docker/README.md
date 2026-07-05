@@ -9,19 +9,22 @@
 ### Build and Run
 
 ```bash
-# Navigate to docker directory
-cd back-end/cicd/docker
+# 1. Tạo back-end/.env (lần đầu)
+cp back-end/.env.sample back-end/.env
 
-# Build and start all services
-docker-compose up --build
+# 2. Start full stack: DB + MinIO + API + Frontend + Adminer
+cd back-end/cicd/docker
+docker compose up --build
 
 # Or run in background
-docker-compose up --build -d
+docker compose up --build -d
 ```
 
 ### Services
 
+- **Frontend (React/Vite)**: http://localhost:5173
 - **API**: http://localhost:30111
+- **API docs**: http://localhost:30111/docs
 - **Database**: PostgreSQL on port 5432
 - **MinIO**: http://localhost:9000 (API) / http://localhost:9001 (Console)
 - **Adminer**: http://localhost:8085 (Database admin)
@@ -43,7 +46,15 @@ Sửa file **`back-end/.env`** — Docker đọc file này khi **restart**, **kh
 
 ```bash
 # Tạo lần đầu (nếu chưa có)
-cp back-end/cicd/config/.env.sample back-end/.env
+cp back-end/.env.sample back-end/.env
+```
+
+Frontend đọc `VITE_API_URL` (mặc định trong compose: `http://localhost:30111`).
+Chạy frontend ngoài Docker:
+
+```bash
+cp font-end/.env.example font-end/.env.development
+cd font-end && npm install && npm run dev
 ```
 
 Trong Docker, các biến sau được override tự động trong `docker-compose.yml`:
@@ -86,13 +97,19 @@ open http://localhost:9001
 
 ### Development
 
-For development with hot reload:
+Chạy full stack local (khuyến nghị):
 
 ```bash
-# Run only database and MinIO
-docker-compose up db minio
+cp back-end/.env.sample back-end/.env
+cd back-end/cicd/docker
+docker compose up --build -d
+# Frontend: http://localhost:5173  |  API: http://localhost:30111
+```
 
-# Run API locally with uvicorn
-cd back-end
-uvicorn app.main:app --host 0.0.0.0 --port 30111 --reload
+Chỉ backend + DB/MinIO, frontend chạy riêng với hot reload nhanh hơn:
+
+```bash
+docker compose up db minio api -d
+cp font-end/.env.example font-end/.env.development
+cd font-end && npm install && npm run dev
 ```

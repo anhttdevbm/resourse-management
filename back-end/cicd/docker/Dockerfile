@@ -1,4 +1,4 @@
-FROM python:3.9-slim-bullseye as setup_env
+FROM python:3.11-slim-bookworm as setup_env
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y postgresql-client
 ENV PERSONAL_ACCESS_TOKEN=$PERSONAL_ACCESS_TOKEN
