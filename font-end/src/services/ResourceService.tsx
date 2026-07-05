@@ -176,7 +176,7 @@ export const ResourceService = {
       
       return null;
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string; code?: string } | string } } };
+      const err = error as { response?: { data?: { message?: string; code?: string } | string } };
       const raw = err?.response?.data;
       const msg = typeof raw === 'string' ? raw : raw?.message;
       const code = typeof raw === 'string' ? undefined : raw?.code;
