@@ -8,6 +8,7 @@ import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { FaUser, FaEnvelope, FaEdit, FaKey, FaCog } from "react-icons/fa";
 import { cookieStorage } from "../utils/cookie";
+import { getApiOrigin } from "../configs/axios";
 
 const Profile = () => {
     const navigate = useNavigate();
@@ -21,7 +22,7 @@ const Profile = () => {
             return `${avatarUrl}?t=${Date.now()}`;
         }
         const token = cookieStorage.getItem("accessToken");
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:30111';
+        const apiUrl = getApiOrigin();
         return token 
             ? `${apiUrl}/resource-management/users/me/avatar?token=${encodeURIComponent(token)}&t=${Date.now()}`
             : undefined;

@@ -18,6 +18,7 @@ import { setAuthLogout } from "../redux/slice/authSlice";
 import { useState, useEffect } from "react";
 import SearchModal from "./SearchModal";
 import NotificationBell from "./NotificationBell";
+import { getApiOrigin } from "../configs/axios";
 import { cookieStorage } from "../utils/cookie";
 import { useI18n } from "../i18n/I18nProvider";
 
@@ -41,7 +42,7 @@ const Header: React.FC<HeaderProps> = ({ onToggleSidebar, isSidebarOpen }) => {
             return `${avatarUrl}?t=${Date.now()}`; // Cache busting
         }
         const token = cookieStorage.getItem("accessToken");
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:30111';
+        const apiUrl = getApiOrigin();
         return token 
             ? `${apiUrl}/resource-management/users/me/avatar?token=${encodeURIComponent(token)}&t=${Date.now()}`
             : undefined;

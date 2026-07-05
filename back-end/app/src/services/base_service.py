@@ -15,7 +15,4 @@ class BaseService:
                                    decouple.config("AWS_SECRET_ACCESS_KEY", None),
                                    decouple.config("AWS_BUCKET_NAME", ""),
                                    decouple.config("AWS_REGION", None))
-        self.engine_postgresql = PostgreSQLDB(decouple.config("HOST_DB", None),
-                                              decouple.config("USERNAME_DB", None),
-                                              decouple.config("PASSWORD_DB", None),
-                                              decouple.config("NAME_DB", None))
+        self.engine_postgresql = PostgreSQLDB()

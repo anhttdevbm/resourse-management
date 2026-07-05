@@ -7,10 +7,9 @@ import {
     setNotifications,
     setStreamingStatus,
 } from "../redux/slice/notificationSlice";
+import { getApiOrigin } from "../configs/axios";
 import { fetchNotifications } from "../services/notificationService";
 import { cookieStorage } from "../utils/cookie";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:30111";
 
 export const useNotificationStream = () => {
     const dispatch = useDispatch();
@@ -31,7 +30,7 @@ export const useNotificationStream = () => {
             if (!token) {
                 return;
             }
-            const streamUrl = `${API_BASE_URL}/resource-management/notifications/stream?token=${token}`;
+            const streamUrl = `${getApiOrigin()}/resource-management/notifications/stream?token=${encodeURIComponent(token)}`;
             const eventSource = new EventSource(streamUrl);
             eventSourceRef.current = eventSource;
 

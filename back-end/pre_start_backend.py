@@ -1,9 +1,10 @@
 import logging
 
-import decouple
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from tenacity import after_log, before_log, retry, stop_after_attempt, wait_fixed
+
+from app.core.db_url import build_database_url
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ wait_seconds = 1
 )
 def init_database():
     try:
-        url = f"postgresql://{decouple.config('USERNAME_DB')}:{decouple.config('PASSWORD_DB')}@{decouple.config('HOST_DB')}/{decouple.config('NAME_DB')}"
+        url = build_database_url()
         engine = create_engine(url, pool_pre_ping=True)
         session = Session(engine)
         return session

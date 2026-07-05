@@ -1,5 +1,5 @@
 """Define postgres connector."""
-from typing import Type, TypeVar
+from typing import Optional, Type, TypeVar
 
 from fastapi.encoders import jsonable_encoder
 from pydantic.main import BaseModel
@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.core.db_url import build_database_url
 from app.src.models.base_model import Base
 
 ModelType = TypeVar("ModelType", bound=Base)
@@ -16,10 +17,17 @@ CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
 class PostgreSQLDB:
     """Define PostgreSQLDB."""
 
-    def __init__(self, host, username, password, database):
-        """Define init."""
-        db_url = f"postgresql://{username}:{password}@{host}/{database}"
-        self.engine = create_engine(db_url)
+    def __init__(
+        self,
+        host: Optional[str] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        database: Optional[str] = None,
+    ):
+        """Khởi tạo engine — dùng build_database_url (host:port + encode credential)."""
+        _ = (host, username, password, database)  # giữ signature cũ cho BaseService
+        db_url = build_database_url()
+        self.engine = create_engine(db_url, pool_pre_ping=True)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         self.Base = declarative_base()
         self.session = Session(self.engine)

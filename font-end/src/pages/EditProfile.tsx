@@ -14,6 +14,7 @@ import { FaUser, FaEnvelope, FaLock, FaCheckCircle, FaCamera } from "react-icons
 import { HiOutlineUser, HiOutlineLockClosed } from "react-icons/hi2";
 import { MdEmail } from "react-icons/md";
 import { cookieStorage } from "../utils/cookie";
+import { getApiOrigin } from "../configs/axios";
 
 const EditProfile = () => {
     const navigate = useNavigate();
@@ -44,7 +45,7 @@ const EditProfile = () => {
                         setAvatarPreview(currentUser.avatar_url);
                     } else {
                         const token = cookieStorage.getItem("accessToken");
-                        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:30111';
+                        const apiUrl = getApiOrigin();
                         const avatarUrl = token 
                             ? `${apiUrl}/resource-management/users/me/avatar?token=${encodeURIComponent(token)}&t=${Date.now()}`
                             : null;
@@ -65,7 +66,7 @@ const EditProfile = () => {
                             setAvatarPreview(userData.avatar_url);
                         } else {
                             const token = cookieStorage.getItem("accessToken");
-                            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:30111';
+                            const apiUrl = getApiOrigin();
                             const avatarUrl = token 
                                 ? `${apiUrl}/resource-management/users/me/avatar?token=${encodeURIComponent(token)}&t=${Date.now()}`
                                 : null;
@@ -144,7 +145,7 @@ const EditProfile = () => {
                 // Build avatar URL with cache busting
                 if (updatedUser.avatar_url) {
                     const token = cookieStorage.getItem("accessToken");
-                    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:30111';
+                    const apiUrl = getApiOrigin();
                     // Always add timestamp for cache busting
                     const timestamp = Date.now();
                     const avatarUrl = token 
@@ -241,7 +242,7 @@ const EditProfile = () => {
                                                             return avatarPreview;
                                                         }
                                                         const token = cookieStorage.getItem("accessToken");
-                                                        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:30111';
+                                                        const apiUrl = getApiOrigin();
                                                         return token 
                                                             ? `${apiUrl}/resource-management/users/me/avatar?token=${encodeURIComponent(token)}&t=${Date.now()}`
                                                             : undefined;

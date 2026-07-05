@@ -12,6 +12,7 @@ import { setAuthLogout } from "../redux/slice/authSlice";
 import { RootState } from "../redux/store";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { cookieStorage } from "../utils/cookie";
+import { getApiOrigin } from "../configs/axios";
 import { useI18n } from "../i18n/I18nProvider";
 
 interface MenuRendererProps {
@@ -77,7 +78,7 @@ const MenuRenderer: React.FC<MenuRendererProps> = ({ className = "" }) => {
             return `${avatarUrl}?t=${Date.now()}`;
         }
         const token = cookieStorage.getItem("accessToken");
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:30111';
+        const apiUrl = getApiOrigin();
         return token 
             ? `${apiUrl}/resource-management/users/me/avatar?token=${encodeURIComponent(token)}&t=${Date.now()}`
             : undefined;
