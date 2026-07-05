@@ -3,7 +3,7 @@ import logging
 import os
 import tempfile
 import uuid
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 from fastapi import UploadFile
 from fastapi.security import HTTPBearer
@@ -30,14 +30,39 @@ def _user_has_admin_access(db_session: Session, user: User) -> bool:
 
 MANAGE_RESOURCES_PERMISSION = "manage_resources"
 
+_FK_UUID_FIELDS = frozenset(
+    {"stage_id", "status_id", "platform_id", "product_type_id", "repo_id"}
+)
+_SKIP_UPDATE_FIELDS = frozenset({"tag_id", "user_id", "key"})
 
-def _resource_update_payload(resource_update: ResourceUpdate) -> dict:
-    """Chỉ gửi field client thực sự set; bỏ None và placeholder 'string'."""
-    update_data = {}
-    for key, value in resource_update.dict(exclude_unset=True).items():
-        if value is not None and value != "string":
+
+def _as_uuid(value: Optional[str]) -> Optional[uuid.UUID]:
+    if value is None or value == "":
+        return None
+    return uuid.UUID(str(value))
+
+
+def _parse_resource_update(
+    resource_update: ResourceUpdate,
+) -> Tuple[Dict[str, object], Optional[uuid.UUID], bool]:
+    """Tách cập nhật cột vs thẻ (M2M). Trả về (columns, tag_id, tag_was_sent)."""
+    raw = resource_update.dict(exclude_unset=True)
+    tag_was_sent = "tag_id" in raw
+    tag_id = _as_uuid(raw.get("tag_id")) if tag_was_sent else None
+
+    update_data: Dict[str, object] = {}
+    for key, value in raw.items():
+        if key in _SKIP_UPDATE_FIELDS:
+            continue
+        if value is None or value == "string":
+            continue
+        if key in _FK_UUID_FIELDS:
+            parsed = _as_uuid(str(value))
+            if parsed is not None:
+                update_data[key] = parsed
+        else:
             update_data[key] = value
-    return update_data
+    return update_data, tag_id, tag_was_sent
 
 
 def _user_has_manage_resources(db_session: Session, user: User) -> bool:
@@ -67,6 +92,48 @@ class ResourceService:
                                       "PackageRepository": "repo_id", "ResourceTag": "tag_id"}
         self.file_repository = FileRepository(models.Resource)
         self.user_repository = UserRepository(models.User)
+
+    def _apply_resource_tags(
+        self,
+        db_session: Session,
+        resource: models.Resource,
+        tag_id: Optional[uuid.UUID],
+    ) -> None:
+        """Gán thẻ qua bảng nối resource_has_resource_tags (không có cột tag_id)."""
+        if tag_id is None:
+            resource.resource_tags.clear()
+        else:
+            tag = (
+                db_session.query(models.ResourceTag)
+                .filter(
+                    models.ResourceTag.id == tag_id,
+                    models.ResourceTag.is_deleted.is_(False),
+                )
+                .first()
+            )
+            if not tag:
+                raise BEErrorCode.RESOURCE_TAG_NOT_FOUND.value
+            resource.resource_tags = [tag]
+        db_session.commit()
+
+    def _persist_resource_update(
+        self,
+        db_session: Session,
+        resource_id: Union[str, uuid.UUID],
+        resource_update: ResourceUpdate,
+    ) -> models.Resource:
+        update_data, tag_id, tag_was_sent = _parse_resource_update(resource_update)
+        if update_data:
+            self.file_repository.update(db_session, obj_id=resource_id, obj_in=update_data)
+        resource = self.file_repository.get(db_session, resource_id)
+        if not resource:
+            raise BEErrorCode.RESOURCE_NOT_FOUND.value
+        if tag_was_sent:
+            self._apply_resource_tags(db_session, resource, tag_id)
+            resource = self.file_repository.get(db_session, resource_id)
+        if not resource:
+            raise BEErrorCode.RESOURCE_NOT_FOUND.value
+        return resource
 
     async def upload_resource(self, file_upload: UploadFile, resource_create: ResourceCreate, user):
         """Define upload resource service (Removed Role Check)."""
@@ -380,15 +447,7 @@ class ResourceService:
             if not deleted:
                 raise BEErrorCode.RESOURCE_NOT_FOUND.value
             resource = deleted
-        update_data = _resource_update_payload(resource_update)
-        if update_data:
-            self.file_repository.update(db_session, obj_id=resource_id, obj_in=update_data)
-        resource = self.file_repository.get(db_session, resource_id)
-        if not resource:
-            resource = self.file_repository.get_back_up(db_session, obj_id=resource_id)
-        if not resource:
-            raise BEErrorCode.RESOURCE_NOT_FOUND.value
-        return resource
+        return self._persist_resource_update(db_session, resource_id, resource_update)
 
     def admin_delete(self, db_session: Session, resource_id: str, actor: User) -> None:
         """Soft-delete any resource (admin only)."""
@@ -422,13 +481,7 @@ class ResourceService:
             raise BEErrorCode.RESOURCE_NOT_FOUND.value
         if not _user_can_update_resource(db_session, resource, user):
             raise BEErrorCode.USER_NOT_PERMISSION.value
-        update_data = _resource_update_payload(resource_update)
-        if update_data:
-            self.file_repository.update(db_session, obj_id=resource_id, obj_in=update_data)
-        resource = self.file_repository.get(db_session, resource_id)
-        if not resource:
-            raise BEErrorCode.RESOURCE_NOT_FOUND.value
-        return resource
+        return self._persist_resource_update(db_session, resource_id, resource_update)
 
     def delete(self, db_session: Session, resource_id: uuid.UUID) -> None:
         """Define remove resource method."""

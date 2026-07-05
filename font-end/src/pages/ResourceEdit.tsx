@@ -49,7 +49,7 @@ const ResourceEdit: React.FC = () => {
     setPlatformId(r.platform_id || '');
     setProductTypeId(r.product_type_id || '');
     setRepoId(r.repo_id || '');
-    setTagId(r.tag_id || '');
+    setTagId(r.tag_id || r.resource_tags?.[0]?.id || '');
   }, []);
 
   useEffect(() => {
