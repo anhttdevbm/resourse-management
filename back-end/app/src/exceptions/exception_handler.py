@@ -16,9 +16,15 @@ async def business_exception_handler(_: Request, exc: BusinessException) -> JSON
     """doc."""
     logging.error(f"{exc.message}\n{exc.data}")
     if GOOGLE_CHAT_WEBHOOK:
-        requests.post(url=GOOGLE_CHAT_WEBHOOK,
-                      data=dumps({"text": f"RABILOO EKYC\n{exc.message}\n{exc.data}"}),
-                      headers={'Content-Type': 'application/json; charset=UTF-8'})
+        try:
+            requests.post(
+                url=GOOGLE_CHAT_WEBHOOK,
+                data=dumps({"text": f"RABILOO EKYC\n{exc.message}\n{exc.data}"}),
+                headers={"Content-Type": "application/json; charset=UTF-8"},
+                timeout=5,
+            )
+        except Exception as webhook_err:
+            logging.warning("Google Chat webhook failed: %s", webhook_err)
     return JSONResponse(
         status_code=exc.status_code,
         content={"code": exc.code, "message": exc.message, "data": exc.data},

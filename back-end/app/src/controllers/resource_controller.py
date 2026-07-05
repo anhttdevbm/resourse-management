@@ -106,11 +106,11 @@ def update_resource_stage(resource_id: str, resource_update: ResourceUpdate, db_
     """Update an existing resource."""
     try:
         data = resource_service.update(db_session, resource_id, resource_update, user[0])
-        return ResponseObject(data=row2dict(data), code="BE0000")
+        return ResponseObject(data=_enrich_resource(data, db_session), code="BE0000")
     except BusinessException:
         raise
     except Exception as exc:
-        logger.exception("PUT /resources/%s failed", resource_id)
+        logger.exception("PUT /resources/%s failed: %s", resource_id, exc)
         raise ServerErrorCode.SERVER_ERROR.value(exc)
 
 

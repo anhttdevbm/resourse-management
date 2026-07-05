@@ -43,7 +43,10 @@ _SKIP_UPDATE_FIELDS = frozenset({"tag_id", "user_id", "key"})
 def _as_uuid(value: Optional[str]) -> Optional[uuid.UUID]:
     if value is None or value == "":
         return None
-    return uuid.UUID(str(value))
+    try:
+        return uuid.UUID(str(value))
+    except (ValueError, TypeError, AttributeError):
+        return None
 
 
 def _parse_resource_update(
@@ -58,7 +61,7 @@ def _parse_resource_update(
     for key, value in raw.items():
         if key in _SKIP_UPDATE_FIELDS:
             continue
-        if value is None or value == "string":
+        if value is None or value == "" or value == "string":
             continue
         if key in _FK_UUID_FIELDS:
             parsed = _as_uuid(str(value))
@@ -74,7 +77,7 @@ def _user_has_manage_resources(db_session: Session, user: User) -> bool:
     if _user_has_admin_access(db_session, user):
         return True
     u = user_service._user_with_permissions(db_session, user.id)
-    if not u:
+    if not u or not getattr(u, "permissions", None):
         return False
     return any(p.name == MANAGE_RESOURCES_PERMISSION for p in u.permissions)
 
@@ -125,6 +128,7 @@ class ResourceService:
             insert(resource_resource_tag).values(
                 resource_id=resource_id,
                 resource_tag_id=tag_id,
+                is_deleted=False,
             )
         )
 

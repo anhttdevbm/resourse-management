@@ -18,6 +18,10 @@ export interface Resource {
     id: string;
     name: string;
   };
+  resource_stage?: {
+    id: string;
+    name: string;
+  };
   resource_platform?: {
     id: string;
     name: string;
@@ -83,7 +87,37 @@ function dictToOptions(data: Record<string, { id?: string; name?: string }> | nu
   return Object.values(data).map((item) => ({
     id: String(item?.id ?? ''),
     name: String(item?.name ?? ''),
-  })).filter((o) => o.id && o.name);
+  })).filter((o) => o.id && o.name && isValidUuid(o.id));
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const FK_UUID_FIELDS = [
+  'stage_id',
+  'status_id',
+  'platform_id',
+  'product_type_id',
+  'repo_id',
+  'tag_id',
+] as const;
+
+export function isValidUuid(value: string | undefined | null): boolean {
+  if (!value || typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  return trimmed.length > 0 && UUID_RE.test(trimmed);
+}
+
+/** Chỉ gửi FK khi là UUID hợp lệ — tránh 500 từ backend khi parse. */
+function sanitizeResourceUpdate(updateData: Partial<Resource>): Partial<Resource> {
+  const out: Partial<Resource> = { ...updateData };
+  for (const key of FK_UUID_FIELDS) {
+    const v = out[key];
+    if (v != null && v !== '' && !isValidUuid(String(v))) {
+      delete out[key];
+    }
+  }
+  return out;
 }
 
 export const ResourceService = {
@@ -168,7 +202,8 @@ export const ResourceService = {
    */
   async updateResource(resourceId: string, updateData: Partial<Resource>): Promise<Resource | null> {
     try {
-      const response = await apiCall.put(`/resource-management/resources/${resourceId}`, updateData);
+      const payload = sanitizeResourceUpdate(updateData);
+      const response = await apiCall.put(`/resource-management/resources/${resourceId}`, payload);
       
       if (response.data && response.data.code === 'BE0000') {
         return response.data.data as any;

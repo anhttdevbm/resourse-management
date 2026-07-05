@@ -44,11 +44,11 @@ const ResourceEdit: React.FC = () => {
   const fillForm = useCallback((r: Resource) => {
     setName(r.name || '');
     setVersion(r.version || '');
-    setStageId(r.stage_id || '');
-    setStatusId(r.status_id || '');
-    setPlatformId(r.platform_id || '');
-    setProductTypeId(r.product_type_id || '');
-    setRepoId(r.repo_id || '');
+    setStageId(r.stage_id || r.resource_stage?.id || '');
+    setStatusId(r.status_id || r.resource_status?.id || '');
+    setPlatformId(r.platform_id || r.resource_platform?.id || '');
+    setProductTypeId(r.product_type_id || r.product_type?.id || '');
+    setRepoId(r.repo_id || r.package_repo?.id || '');
     setTagId(r.tag_id || r.resource_tags?.[0]?.id || '');
   }, []);
 
