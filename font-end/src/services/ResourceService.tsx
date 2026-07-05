@@ -175,9 +175,12 @@ export const ResourceService = {
       }
       
       return null;
-    } catch (error) {
-      console.error('❌ Error updating resource:', error);
-      throw error;
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string; code?: string } } };
+      const msg = err?.response?.data?.message;
+      const code = err?.response?.data?.code;
+      console.error('❌ Error updating resource:', code, msg, error);
+      throw new Error(msg || 'Cập nhật thất bại');
     }
   },
 

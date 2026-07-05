@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from fastapi import UploadFile
 from fastapi.security import HTTPBearer
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.src import models
@@ -101,20 +102,33 @@ class ResourceService:
     ) -> None:
         """Gán thẻ qua bảng nối resource_has_resource_tags (không có cột tag_id)."""
         if tag_id is None:
-            resource.resource_tags.clear()
-        else:
-            tag = (
-                db_session.query(models.ResourceTag)
-                .filter(
-                    models.ResourceTag.id == tag_id,
-                    models.ResourceTag.is_deleted.is_(False),
-                )
-                .first()
+            resource.resource_tags = []
+            return
+        tag = (
+            db_session.query(models.ResourceTag)
+            .filter(
+                models.ResourceTag.id == tag_id,
+                models.ResourceTag.is_deleted.is_(False),
             )
-            if not tag:
-                raise BEErrorCode.RESOURCE_TAG_NOT_FOUND.value
-            resource.resource_tags = [tag]
-        db_session.commit()
+            .first()
+        )
+        if not tag:
+            raise BEErrorCode.RESOURCE_TAG_NOT_FOUND.value
+        resource.resource_tags = [tag]
+
+    def _commit_resource_changes(self, db_session: Session, resource: models.Resource) -> None:
+        try:
+            db_session.commit()
+            db_session.refresh(resource)
+        except IntegrityError as ex:
+            db_session.rollback()
+            detail = str(getattr(ex, "orig", ex)).lower()
+            if "resources_name" in detail or ("unique" in detail and "name" in detail):
+                raise BEErrorCode.RESOURCE_NAME_EXISTED.value(ex)
+            raise ServerErrorCode.DATABASE_ERROR.value(ex)
+        except SQLAlchemyError as ex:
+            db_session.rollback()
+            raise ServerErrorCode.DATABASE_ERROR.value(ex)
 
     def _persist_resource_update(
         self,
@@ -122,17 +136,22 @@ class ResourceService:
         resource_id: Union[str, uuid.UUID],
         resource_update: ResourceUpdate,
     ) -> models.Resource:
-        update_data, tag_id, tag_was_sent = _parse_resource_update(resource_update)
-        if update_data:
-            self.file_repository.update(db_session, obj_id=resource_id, obj_in=update_data)
-        resource = self.file_repository.get(db_session, resource_id)
+        rid = uuid.UUID(str(resource_id))
+        resource = (
+            db_session.query(models.Resource)
+            .filter(models.Resource.id == rid, models.Resource.is_deleted.is_(False))
+            .first()
+        )
         if not resource:
             raise BEErrorCode.RESOURCE_NOT_FOUND.value
+
+        update_data, tag_id, tag_was_sent = _parse_resource_update(resource_update)
+        for key, value in update_data.items():
+            setattr(resource, key, value)
         if tag_was_sent:
             self._apply_resource_tags(db_session, resource, tag_id)
-            resource = self.file_repository.get(db_session, resource_id)
-        if not resource:
-            raise BEErrorCode.RESOURCE_NOT_FOUND.value
+
+        self._commit_resource_changes(db_session, resource)
         return resource
 
     async def upload_resource(self, file_upload: UploadFile, resource_create: ResourceCreate, user):

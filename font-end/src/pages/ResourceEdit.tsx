@@ -102,12 +102,12 @@ const ResourceEdit: React.FC = () => {
       const updated = await ResourceService.updateResource(id, {
         name: trimmedName,
         version: trimmedVersion,
-        stage_id: stageId || undefined,
-        status_id: statusId || undefined,
-        platform_id: platformId || undefined,
-        product_type_id: productTypeId || undefined,
-        repo_id: repoId || undefined,
-        tag_id: tagId || undefined,
+        ...(stageId ? { stage_id: stageId } : {}),
+        ...(statusId ? { status_id: statusId } : {}),
+        ...(platformId ? { platform_id: platformId } : {}),
+        ...(productTypeId ? { product_type_id: productTypeId } : {}),
+        ...(repoId ? { repo_id: repoId } : {}),
+        ...(tagId ? { tag_id: tagId } : {}),
       });
       if (updated) {
         toast.success('Đã cập nhật tài nguyên.');
@@ -117,7 +117,8 @@ const ResourceEdit: React.FC = () => {
       }
     } catch (err: unknown) {
       console.error(err);
-      toast.error('Lỗi khi cập nhật tài nguyên.');
+      const message = err instanceof Error ? err.message : 'Lỗi khi cập nhật tài nguyên.';
+      toast.error(message);
     } finally {
       setSaving(false);
     }

@@ -65,6 +65,12 @@ class BEErrorCode(Enum):
     PERMISSION_IN_USE = BusinessException(
         ExceptionDetail(message="Permission is assigned to users", code="BE0046")
     )
+    RESOURCE_NOT_FOUND = BusinessException(
+        ExceptionDetail(message="Resource Not Found", code="BE0047")
+    )
+    RESOURCE_NAME_EXISTED = BusinessException(
+        ExceptionDetail(message="Resource name already exists", code="BE0048")
+    )
 
 class ServerErrorCode(Enum):
     """doc."""
