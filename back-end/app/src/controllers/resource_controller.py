@@ -1,4 +1,5 @@
 """Define resource controller."""
+import logging
 import os
 from typing import List, Optional, Tuple
 
@@ -13,12 +14,14 @@ from app.src.schemas.resource import ResourceCreate, ResourceUpdate
 from app.src.schemas.resource import ResourceGet
 from app.src.schemas.resource_share import ResourceShareCreate
 from app.src.schemas.response import ResponseObject
-from app.src.exceptions.error_code import BEErrorCode
+from app.src.exceptions.error_code import BEErrorCode, ServerErrorCode
+from app.src.exceptions.exception import BusinessException
 from app.src.services.resource_service import ResourceService
 from app.src.utils.common import row2dict
 from app.src.utils.connection.sql_connection import get_db_session
 
 resource_service = ResourceService()
+logger = logging.getLogger(__name__)
 
 resource_routers = APIRouter()
 
@@ -101,8 +104,14 @@ async def create_one(
 def update_resource_stage(resource_id: str, resource_update: ResourceUpdate, db_session: Session = Depends(get_db_session) # noqa
                           , user: Tuple[User, str] = Depends(user_service.get_current_user)) -> ResponseObject: # noqa
     """Update an existing resource."""
-    data = resource_service.update(db_session, resource_id, resource_update, user[0])
-    return ResponseObject(data=row2dict(data), code="BE0000")
+    try:
+        data = resource_service.update(db_session, resource_id, resource_update, user[0])
+        return ResponseObject(data=row2dict(data), code="BE0000")
+    except BusinessException:
+        raise
+    except Exception as exc:
+        logger.exception("PUT /resources/%s failed", resource_id)
+        raise ServerErrorCode.SERVER_ERROR.value(exc)
 
 
 @resource_routers.get("/resources/{resource_id}")

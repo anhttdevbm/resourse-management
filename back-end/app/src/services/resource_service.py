@@ -7,12 +7,14 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from fastapi import UploadFile
 from fastapi.security import HTTPBearer
+from sqlalchemy import delete, insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.src import models
-from app.src.exceptions.error_code import BEErrorCode
+from app.src.exceptions.error_code import BEErrorCode, ServerErrorCode
 from app.src.models import User
+from app.src.models.resource_has_resource_tag import resource_resource_tag
 from app.src.repositories.resource import FileRepository
 from app.src.repositories.user import UserRepository
 from app.src.schemas.resource import ResourceCreate, ResourceInfoCreate, ResourceUpdate
@@ -20,6 +22,7 @@ from app.src.schemas.resource import ResourceGet
 from app.src.schemas.resource_share import ResourceShareCreate, ResourceShareInfo
 from app.src.services.base_service import BaseService
 from app.src.services.user_service import UserService
+from app.src.utils.common import pydantic_to_dict
 
 reusable_oauth2 = HTTPBearer(scheme_name="Authorization")
 user_service = UserService()
@@ -47,7 +50,7 @@ def _parse_resource_update(
     resource_update: ResourceUpdate,
 ) -> Tuple[Dict[str, object], Optional[uuid.UUID], bool]:
     """Tách cập nhật cột vs thẻ (M2M). Trả về (columns, tag_id, tag_was_sent)."""
-    raw = resource_update.dict(exclude_unset=True)
+    raw = pydantic_to_dict(resource_update, exclude_unset=True)
     tag_was_sent = "tag_id" in raw
     tag_id = _as_uuid(raw.get("tag_id")) if tag_was_sent else None
 
@@ -94,15 +97,19 @@ class ResourceService:
         self.file_repository = FileRepository(models.Resource)
         self.user_repository = UserRepository(models.User)
 
-    def _apply_resource_tags(
+    def _sync_resource_tags(
         self,
         db_session: Session,
-        resource: models.Resource,
+        resource_id: uuid.UUID,
         tag_id: Optional[uuid.UUID],
     ) -> None:
-        """Gán thẻ qua bảng nối resource_has_resource_tags (không có cột tag_id)."""
+        """Cập nhật thẻ qua bảng nối (resources không có cột tag_id)."""
+        db_session.execute(
+            delete(resource_resource_tag).where(
+                resource_resource_tag.c.resource_id == resource_id
+            )
+        )
         if tag_id is None:
-            resource.resource_tags = []
             return
         tag = (
             db_session.query(models.ResourceTag)
@@ -114,12 +121,25 @@ class ResourceService:
         )
         if not tag:
             raise BEErrorCode.RESOURCE_TAG_NOT_FOUND.value
-        resource.resource_tags = [tag]
+        db_session.execute(
+            insert(resource_resource_tag).values(
+                resource_id=resource_id,
+                resource_tag_id=tag_id,
+            )
+        )
 
-    def _commit_resource_changes(self, db_session: Session, resource: models.Resource) -> None:
+    def _fetch_resource(
+        self, db_session: Session, resource_id: uuid.UUID
+    ) -> Optional[models.Resource]:
+        return (
+            db_session.query(models.Resource)
+            .filter(models.Resource.id == resource_id, models.Resource.is_deleted.is_(False))
+            .first()
+        )
+
+    def _commit_resource_changes(self, db_session: Session) -> None:
         try:
             db_session.commit()
-            db_session.refresh(resource)
         except IntegrityError as ex:
             db_session.rollback()
             detail = str(getattr(ex, "orig", ex)).lower()
@@ -137,11 +157,7 @@ class ResourceService:
         resource_update: ResourceUpdate,
     ) -> models.Resource:
         rid = uuid.UUID(str(resource_id))
-        resource = (
-            db_session.query(models.Resource)
-            .filter(models.Resource.id == rid, models.Resource.is_deleted.is_(False))
-            .first()
-        )
+        resource = self._fetch_resource(db_session, rid)
         if not resource:
             raise BEErrorCode.RESOURCE_NOT_FOUND.value
 
@@ -149,9 +165,12 @@ class ResourceService:
         for key, value in update_data.items():
             setattr(resource, key, value)
         if tag_was_sent:
-            self._apply_resource_tags(db_session, resource, tag_id)
+            self._sync_resource_tags(db_session, rid, tag_id)
 
-        self._commit_resource_changes(db_session, resource)
+        self._commit_resource_changes(db_session)
+        resource = self._fetch_resource(db_session, rid)
+        if not resource:
+            raise BEErrorCode.RESOURCE_NOT_FOUND.value
         return resource
 
     async def upload_resource(self, file_upload: UploadFile, resource_create: ResourceCreate, user):
