@@ -17,8 +17,11 @@ resource-management/
 ```bash
 cd font-end
 npm install
+cp .env.example .env.development   # VITE_API_URL=http://localhost:30111
 npm run dev
 ```
+
+Hoặc chạy cùng backend qua Docker: xem `back-end/cicd/docker/README.md`.
 
 ## Backend
 
