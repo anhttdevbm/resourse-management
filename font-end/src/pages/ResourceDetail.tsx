@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import PageHeading from '../components/heading';
 import { ResourceService, type Resource, type ResourceShareInfo } from '../services/ResourceService';
 import { useAuth } from '../contexts/AuthContext';
-import { FaArrowLeft, FaDownload, FaFile, FaCalendarAlt, FaTag, FaBox, FaFolder, FaServer, FaImage, FaShareAlt, FaTrash } from 'react-icons/fa';
+import { FaArrowLeft, FaDownload, FaFile, FaCalendarAlt, FaTag, FaBox, FaFolder, FaServer, FaImage, FaShareAlt, FaTrash, FaEdit } from 'react-icons/fa';
 
 const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|bmp|svg)$/i;
 
@@ -13,7 +13,7 @@ function isImageResource(url: string | undefined): boolean {
 
 const ResourceDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, isAdmin, hasPermission } = useAuth();
   const [resource, setResource] = useState<Resource | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -131,6 +131,7 @@ const ResourceDetail: React.FC = () => {
   };
 
   const isOwner = !!(user && resource && resource.user_id === user.id);
+  const canEdit = isOwner || isAdmin || hasPermission('manage_resources');
 
   const handleShareSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,6 +213,15 @@ const ResourceDetail: React.FC = () => {
             Quay lại danh sách
           </Link>
           <div className="flex items-center gap-2">
+            {canEdit && (
+              <Link
+                to={`/resources/${resource.id}/edit`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded-lg hover:bg-yellow-100 transition-colors text-sm font-medium"
+              >
+                <FaEdit className="w-4 h-4" />
+                Chỉnh sửa
+              </Link>
+            )}
             {isOwner && (
               <button
                 onClick={() => setShareModalOpen(true)}

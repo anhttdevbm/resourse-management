@@ -42,6 +42,7 @@ import ResourceFavorites from './pages/ResourceFavorites'
 import ResourceBookmarks from './pages/ResourceBookmarks'
 import ResourceUpload from './pages/ResourceUpload'
 import ResourceDetail from './pages/ResourceDetail'
+import ResourceEdit from './pages/ResourceEdit'
 import UploadHistory from './pages/UploadHistory'
 import UploadQueue from './pages/UploadQueue'
 import ApkFiles from './pages/ApkFiles'
@@ -218,6 +219,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <ResourceUpload />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: '/resources/:id/edit',
+        element: (
+          <ProtectedRoute>
+            <ResourceEdit />
           </ProtectedRoute>
         )
       },

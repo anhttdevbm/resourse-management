@@ -45,7 +45,8 @@ const STATUS_I18N: Record<string, TranslationKey> = {
 };
 
 const Resources: React.FC = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, hasPermission } = useAuth();
+  const canEditResource = isAdmin || hasPermission('manage_resources');
   const { t, locale } = useI18n();
   const navigate = useNavigate();
   const [resources, setResources] = useState<Resource[]>([]);
@@ -626,9 +627,9 @@ const Resources: React.FC = () => {
                             >
                               <FaTrash className="w-4 h-4" />
                             </button>
-                            {isAdmin && (
+                            {canEditResource && (
                               <button
-                                onClick={() => (window.location.href = `/resources/${resource.id}/edit`)}
+                                onClick={() => navigate(`/resources/${resource.id}/edit`)}
                                 className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
                                 title={t('resources.action.edit')}
                               >
@@ -784,9 +785,9 @@ const Resources: React.FC = () => {
                       >
                         <FaTrash className="w-3 h-3" />
                       </button>
-                      {isAdmin && (
+                      {canEditResource && (
                         <button
-                          onClick={() => (window.location.href = `/resources/${resource.id}/edit`)}
+                          onClick={() => navigate(`/resources/${resource.id}/edit`)}
                           className="px-3 py-2 bg-yellow-100 text-yellow-600 rounded-lg hover:bg-yellow-200 transition-colors text-xs"
                           title={t('resources.action.edit')}
                         >
