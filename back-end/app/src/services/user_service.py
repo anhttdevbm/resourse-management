@@ -128,7 +128,7 @@ class UserService(object):
         create_data = {
             "name": user_create.name.strip(),
             "email": user_create.email.strip().lower(),
-            "password": get_password_hash(user_create.password).decode("utf-8"),
+            "password": get_password_hash(user_create.password),
         }
         user = self.user_repository.create(db_session, obj_in=create_data)
         self._assign_basic_permissions_sync(db_session, user)
@@ -209,7 +209,7 @@ class UserService(object):
         update_data = user_update.dict(exclude_unset=True)
         update_data = {k: v for k, v in update_data.items() if v is not None}
         if "password" in update_data and update_data["password"]:
-            update_data["password"] = get_password_hash(update_data["password"]).decode("utf-8")
+            update_data["password"] = get_password_hash(update_data["password"])
         elif "password" in update_data:
             del update_data["password"]
         if "email" in update_data and update_data["email"]:
@@ -535,7 +535,7 @@ class UserService(object):
                 raise AuthErrorCode.EMAIL_EXISTED.value
             update_data['email'] = user_update.email
         if user_update.password is not None:
-            update_data['password'] = get_password_hash(user_update.password).decode("utf-8")
+            update_data['password'] = get_password_hash(user_update.password)
         if user_update.avatar_url is not None:
             update_data['avatar_url'] = user_update.avatar_url
         
@@ -606,7 +606,7 @@ class UserService(object):
                     raise BEErrorCode.USER_NOT_FOUND.value
                 update_data = {key: value for key, value in user_update_password.__dict__.items() if value not in [None, 'string'] and key != 'token'}
                 if 'password' in update_data:
-                     update_data['password'] = get_password_hash(update_data['password']).decode("utf-8")
+                     update_data['password'] = get_password_hash(update_data['password'])
                 user = self.user_repository.update(db_session, obj_id=user_id, obj_in=update_data)
                 user = self.user_repository.get(db_session, user_id)
                 data = {}
