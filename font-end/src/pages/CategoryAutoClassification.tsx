@@ -11,7 +11,7 @@ import {
   type AutoMatchField,
   type AutoMatchOp,
 } from '../services/AutoClassificationRulesApi';
-import { ResourceService, type Resource, type ResourceUploadOptions } from '../services/ResourceService';
+import { ResourceService, type Resource, type ResourceUploadOptions, isValidUuid } from '../services/ResourceService';
 import { useAuth } from '../contexts/AuthContext';
 import {
   FaSearch,
@@ -102,16 +102,41 @@ function pickFirstMatchingRule(
   return null;
 }
 
+function currentStageId(res: Resource): string | undefined {
+  return res.stage_id || res.resource_stage?.id;
+}
+function currentStatusId(res: Resource): string | undefined {
+  return res.status_id || res.resource_status?.id;
+}
+function currentPlatformId(res: Resource): string | undefined {
+  return res.platform_id || res.resource_platform?.id;
+}
+function currentProductTypeId(res: Resource): string | undefined {
+  return res.product_type_id || res.product_type?.id;
+}
+function currentRepoId(res: Resource): string | undefined {
+  return res.repo_id || res.package_repo?.id;
+}
+function currentTagId(res: Resource): string | undefined {
+  return res.tag_id || res.resource_tags?.[0]?.id;
+}
+
 function buildPatchFromRule(rule: AutoClassificationRule, res: Resource): Partial<Resource> | null {
   const patch: Partial<Resource> = {};
-  if (rule.assignStageId && res.stage_id !== rule.assignStageId) patch.stage_id = rule.assignStageId;
-  if (rule.assignStatusId && res.status_id !== rule.assignStatusId) patch.status_id = rule.assignStatusId;
-  if (rule.assignPlatformId && res.platform_id !== rule.assignPlatformId)
-    patch.platform_id = rule.assignPlatformId;
-  if (rule.assignProductTypeId && res.product_type_id !== rule.assignProductTypeId)
-    patch.product_type_id = rule.assignProductTypeId;
-  if (rule.assignRepoId && res.repo_id !== rule.assignRepoId) patch.repo_id = rule.assignRepoId;
-  if (rule.assignTagId && res.tag_id !== rule.assignTagId) patch.tag_id = rule.assignTagId;
+  const add = (
+    key: 'stage_id' | 'status_id' | 'platform_id' | 'product_type_id' | 'repo_id' | 'tag_id',
+    ruleId: string | undefined,
+    current: string | undefined
+  ) => {
+    if (!ruleId || !isValidUuid(ruleId)) return;
+    if (current !== ruleId) patch[key] = ruleId;
+  };
+  add('stage_id', rule.assignStageId, currentStageId(res));
+  add('status_id', rule.assignStatusId, currentStatusId(res));
+  add('platform_id', rule.assignPlatformId, currentPlatformId(res));
+  add('product_type_id', rule.assignProductTypeId, currentProductTypeId(res));
+  add('repo_id', rule.assignRepoId, currentRepoId(res));
+  add('tag_id', rule.assignTagId, currentTagId(res));
   return Object.keys(patch).length ? patch : null;
 }
 

@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import Login from './pages/Login'
+import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import User from './pages/user/user/View.tsx'
 import Layout from './components/layout'
@@ -62,6 +63,14 @@ const router = createBrowserRouter([
     element: (
       <LoginMiddleware>
         <Login />
+      </LoginMiddleware>
+    )
+  },
+  {
+    path: "/register",
+    element: (
+      <LoginMiddleware>
+        <Register />
       </LoginMiddleware>
     )
   },

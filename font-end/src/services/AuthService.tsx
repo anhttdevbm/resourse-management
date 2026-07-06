@@ -9,6 +9,36 @@ type LOGINPAYLOAD = {
     password: string
 };
 
+type REGISTERPAYLOAD = {
+    name: string;
+    email: string;
+    password: string;
+};
+
+const register = async (payload: REGISTERPAYLOAD): Promise<User | null> => {
+    try {
+        const response = await axiosInstance.post('/api/auth/user/register', {
+            name: payload.name,
+            email: payload.email,
+            password: payload.password,
+        });
+        const user = response.data.data.user;
+        const accessToken = response.data.data.token.access_token;
+        const refreshToken = response.data.data.token.refresh_token;
+
+        if (accessToken) {
+            cookieStorage.setItem("accessToken", accessToken, { expires: 7 });
+            cookieStorage.setItem("refreshToken", refreshToken, { expires: 30 });
+            cookieStorage.setItem("user", JSON.stringify(user), { expires: 7 });
+        }
+
+        return user;
+    } catch (error) {
+        handleAxiosError(error);
+        return null;
+    }
+};
+
 const login = async (payload: LOGINPAYLOAD): Promise<User | null> => {
     try {
         const response = await axiosInstance.post('/api/auth/user/login', {
@@ -201,4 +231,4 @@ const logout = async (): Promise<void> => {
     }
 };
 
-export { login, fetchUser, forgotPassword, resetPassword, logout, facebookLogin, twitterLogin, googleLogin, githubLogin, handleFacebookCallback, handleTwitterCallback, handleGoogleCallback, handleGithubCallback };
+export { login, register, fetchUser, forgotPassword, resetPassword, logout, facebookLogin, twitterLogin, googleLogin, githubLogin, handleFacebookCallback, handleTwitterCallback, handleGoogleCallback, handleGithubCallback };

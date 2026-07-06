@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 class UserLogin(BaseModel):
     """Schema define login data."""
@@ -12,6 +12,14 @@ class UserCreate(UserLogin):
     """Define User input schema to create user."""
 
     name: str
+
+
+class UserRegister(BaseModel):
+    """Public self-registration."""
+
+    name: str = Field(..., min_length=1, max_length=255)
+    email: EmailStr
+    password: str = Field(..., min_length=6, max_length=128)
 
 
 class UserPermissionPatch(BaseModel):

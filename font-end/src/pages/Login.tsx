@@ -301,6 +301,7 @@ const Login = () => {
 
                                     <div className='d-flex justify-content-between mb-4'>
                                         <a href="/forgot-password" className='text-primary'>Quên mật khẩu?</a>
+                                        <a href="/register" className='text-primary'>Đăng ký tài khoản</a>
                                     </div>
 
                                     <Button disabled={loading} className="text-xs w-100 mb-4">
