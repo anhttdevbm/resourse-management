@@ -101,7 +101,7 @@ class UserService(object):
             password: str,
     ) -> models.User:
         """Define authenticate method."""
-        user = self.user_repository.get_user_by_email(db_session, email)
+        user = self.user_repository.get_user_by_email(db_session, email.strip().lower())
         if not user:
             raise AuthErrorCode.USERNAME_NOT_FOUND.value
         self._ensure_user_not_locked(user)
@@ -123,7 +123,7 @@ class UserService(object):
         if actor is not None and not self._has_admin_access(db_session, actor):
             raise BEErrorCode.USER_NOT_PERMISSION.value
         if self.user_repository.get_user_by_email(db_session, user_create.email):
-            raise AuthErrorCode.USER_EXISTED.value
+            raise AuthErrorCode.EMAIL_EXISTED.value
 
         create_data = {
             "name": user_create.name.strip(),

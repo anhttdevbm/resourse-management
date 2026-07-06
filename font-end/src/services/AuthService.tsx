@@ -1,3 +1,5 @@
+import axios from "axios";
+import { toast } from "react-toastify";
 import axiosInstance, { getApiOrigin } from "../configs/axios";
 import { handleAxiosError } from "../helpers/axiosHelper";
 import { User } from "../types/User";
@@ -34,6 +36,10 @@ const register = async (payload: REGISTERPAYLOAD): Promise<User | null> => {
 
         return user;
     } catch (error) {
+        if (axios.isAxiosError(error) && (error.response?.data?.code === 'AUTH0008' || error.response?.data?.code === 'AUTH0016')) {
+            toast.error('Email này đã được đăng ký. Hãy đăng nhập hoặc dùng Quên mật khẩu nếu bạn đã có tài khoản.');
+            return null;
+        }
         handleAxiosError(error);
         return null;
     }

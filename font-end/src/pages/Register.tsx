@@ -53,9 +53,8 @@ const Register = () => {
         dispatch(setToast({ message: 'Đăng ký thành công! Chào mừng bạn.', type: 'success' }));
         dispatch(setAuthLogin(user ?? auth));
         navigate('/dashboard');
-      } else {
-        dispatch(setToast({ message: 'Đăng ký thất bại, vui lòng kiểm tra lại.', type: 'error' }));
       }
+      // Lỗi AUTH0008 đã hiển thị toast trong AuthService.register
     } catch (error) {
       console.error('Register error:', error);
       dispatch(setToast({ message: 'Có lỗi xảy ra, vui lòng thử lại!', type: 'error' }));
@@ -148,6 +147,10 @@ const Register = () => {
                   Đã có tài khoản?{' '}
                   <Link to="/login" className="text-primary fw-semibold">
                     Đăng nhập
+                  </Link>
+                  {' · '}
+                  <Link to="/forgot-password" className="text-primary fw-semibold">
+                    Quên mật khẩu
                   </Link>
                 </p>
               </MDBCardBody>

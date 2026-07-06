@@ -13,10 +13,20 @@ class UserRepository(BaseSQLRepository[models.User]):
     """Define User System repository."""
 
     def get_user_by_email(self, session: Session, value: Any) -> Union[Optional[models.User]]:
-        """Define method get user by email."""
+        """Tìm user theo email (không phân biệt hoa thường). Đăng nhập/đăng ký dùng email, không có username riêng."""
         try:
-            obj = session.query(self.model).filter(self.model.email == value,
-                                                   self.model.is_deleted.is_(False)).first()
+            email = str(value).strip().lower() if value is not None else ""
+            if not email:
+                return None
+            from sqlalchemy import func
+            obj = (
+                session.query(self.model)
+                .filter(
+                    func.lower(self.model.email) == email,
+                    self.model.is_deleted.is_(False),
+                )
+                .first()
+            )
         except SQLAlchemyError as ex:
             raise ServerErrorCode.DATABASE_ERROR.value(ex)
         return obj

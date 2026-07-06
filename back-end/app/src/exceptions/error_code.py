@@ -93,7 +93,7 @@ class AuthErrorCode(Enum):
     BLACKLIST_TOKEN = BusinessException(ExceptionDetail(message="Blacklisted Token", code="AUTH0005"))
     EXPIRED_ACCESS_TOKEN = BusinessException(ExceptionDetail(message="Expired Access Token", code="AUTH0006"))
     PERMISSION_DENIED = BusinessException(ExceptionDetail(message="Permission Denied", code="AUTH0007"))
-    USER_EXISTED = BusinessException(ExceptionDetail(message="Username Existed", code="AUTH0008"))
+    USER_EXISTED = BusinessException(ExceptionDetail(message="Email already registered", code="AUTH0008"))
     INVALID_ENCRYPTION_KEY = BusinessException(ExceptionDetail(message="Invalid Public Key", code="AUTH0009"))
     INVALID_SIGNATURE = BusinessException(ExceptionDetail(message="Invalid Signature", code="AUTH0010"))
     TOKEN_NOT_FOUND = BusinessException(ExceptionDetail(message="Token Not Found", code="AUTH0011"))
@@ -101,6 +101,6 @@ class AuthErrorCode(Enum):
     INVALID_REFRESH_TOKEN = BusinessException(ExceptionDetail(message="Invalid Refresh Access Token", code="AUTH0013"))
     EXPIRED_REFRESH_TOKEN = BusinessException(ExceptionDetail(message="Expired Refresh Token", code="AUTH0014"))
     INVALID_TOKEN = BusinessException(ExceptionDetail(message="Invalid Token", code="AUTH0015"))
-    EMAIL_EXISTED = BusinessException(ExceptionDetail(message="Email Has Been Used", code="AUTH0016"))
+    EMAIL_EXISTED = BusinessException(ExceptionDetail(message="Email already registered", code="AUTH0016"))
     ACCOUNT_LOCKED = BusinessException(ExceptionDetail(message="Account is locked", code="AUTH0017"))
 
