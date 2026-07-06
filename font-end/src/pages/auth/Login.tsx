@@ -1,6 +1,17 @@
 import { useForm, SubmitHandler } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { login, facebookLogin, twitterLogin, googleLogin, githubLogin, handleFacebookCallback, handleTwitterCallback, handleGoogleCallback, handleGithubCallback, fetchUser } from "../services/AuthService";
+import {
+    login,
+    facebookLogin,
+    twitterLogin,
+    googleLogin,
+    githubLogin,
+    handleFacebookCallback,
+    handleTwitterCallback,
+    handleGoogleCallback,
+    handleGithubCallback,
+    fetchUser,
+} from "../../services/auth";
 import {
     MDBContainer,
     MDBRow,
@@ -11,18 +22,18 @@ import {
     MDBBtn,
     MDBIcon
 } from 'mdb-react-ui-kit';
-import './setting.scss';
+import '../setting.scss';
 import './Login.scss';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { setToast } from "../redux/slice/toastSlice";
+import { setToast } from "../../redux/slice/toastSlice";
 import { useDispatch } from "react-redux";
-import { Button } from "../components/ui/button";
+import { Button } from "../../components/ui/button";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { useState } from "react";
-import { setAuthLogin } from "../redux/slice/authSlice";
+import { setAuthLogin } from "../../redux/slice/authSlice";
 import { useEffect } from "react";
-import { cookieStorage } from "../utils/cookie";
+import { cookieStorage } from "../../utils/cookie";
 
 type Inputs = {
     email: string;

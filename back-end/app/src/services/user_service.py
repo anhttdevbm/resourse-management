@@ -100,7 +100,7 @@ class UserService(object):
             email: str,
             password: str,
     ) -> models.User:
-        """Define authenticate method."""
+        """Verify email/password against PostgreSQL users table."""
         user = self.user_repository.get_user_by_email(db_session, email.strip().lower())
         if not user:
             raise AuthErrorCode.USERNAME_NOT_FOUND.value
@@ -119,7 +119,7 @@ class UserService(object):
         return self._serialize_user_admin(target)
 
     def create_user(self, db_session: Session, user_create: UserCreate, actor: Optional[models.User] = None) -> models.User:
-        """Define create user method."""
+        """Create user record and assign default permissions."""
         if actor is not None and not self._has_admin_access(db_session, actor):
             raise BEErrorCode.USER_NOT_PERMISSION.value
         if self.user_repository.get_user_by_email(db_session, user_create.email):

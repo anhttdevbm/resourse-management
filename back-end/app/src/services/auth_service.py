@@ -51,7 +51,7 @@ class AuthService(object):
 
     @staticmethod
     def login(val_input: str) -> Dict[str, str]:
-        """Define login with username and password method."""
+        """Issue access and refresh JWT tokens."""
         access_token = jwt_create_token(val_input)
         refresh_token = jwt_create_token(val_input, expires_minutes=int(REFRESH_TOKEN_EXPIRE_MINUTES))
         return {"access_token": access_token, "refresh_token": refresh_token}

@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import Login from './pages/Login'
+import Login from './pages/auth/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import User from './pages/user/user/View.tsx'

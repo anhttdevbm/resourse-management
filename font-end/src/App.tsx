@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
-import Login from './pages/Login';
+import Login from './pages/auth/Login';
 import Unauthorized from './pages/Unauthorized';
 import AdminUsers from './pages/admin/Users';
 import AdminPermissions from './pages/admin/Permissions';

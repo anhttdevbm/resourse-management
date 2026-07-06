@@ -1,4 +1,4 @@
-"""Define resource controller."""
+"""Resource API endpoints."""
 import logging
 import os
 from typing import List, Optional, Tuple
@@ -91,20 +91,24 @@ async def create_one(
         tag_id=tag_id,
     )
     try:
-        print(f"🔄 Uploading resource: {file_upload.filename}")
         result = await resource_service.upload_resource(file_upload, resource_create, user[0])
-        print(f"✅ Upload successful: {result}")
+
         return ResponseObject(data=row2dict(result), code="BE0000", message="Upload successful")
     except Exception as e:
-        print(f"❌ Upload error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# =============================================================================
+# UC-RES-01: Cập nhật metadata tài nguyên
+# Layer: Controller → ResourceService → Repository / SQL
+# =============================================================================
 
 @resource_routers.put("/resources/{resource_id}")
 def update_resource_stage(resource_id: str, resource_update: ResourceUpdate, db_session: Session = Depends(get_db_session) # noqa
                           , user: Tuple[User, str] = Depends(user_service.get_current_user)) -> ResponseObject: # noqa
-    """Update an existing resource."""
+    """Bước 3 (API): PUT /resource-management/resources/{id}."""
     try:
+        # Bước 4–6: resource_service.update → _persist_resource_update
         data = resource_service.update(db_session, resource_id, resource_update, user[0])
         return ResponseObject(data=_enrich_resource(data, db_session), code="BE0000")
     except BusinessException:

@@ -13,7 +13,7 @@ class UserRepository(BaseSQLRepository[models.User]):
     """Define User System repository."""
 
     def get_user_by_email(self, session: Session, value: Any) -> Union[Optional[models.User]]:
-        """Tìm user theo email (không phân biệt hoa thường). Đăng nhập/đăng ký dùng email, không có username riêng."""
+        """Find active user by email (case-insensitive)."""
         try:
             email = str(value).strip().lower() if value is not None else ""
             if not email:

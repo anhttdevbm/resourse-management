@@ -13,7 +13,7 @@ GOOGLE_CHAT_WEBHOOK = decouple.config("GOOGLE_CHAT_WEBHOOK", "")
 
 
 async def business_exception_handler(_: Request, exc: BusinessException) -> JSONResponse:
-    """doc."""
+    """UC-AUTH-01 nhánh lỗi: AUTH0001/AUTH0002/… → JSON 400 cho frontend hiển thị."""
     logging.error(f"{exc.message}\n{exc.data}")
     if GOOGLE_CHAT_WEBHOOK:
         try:

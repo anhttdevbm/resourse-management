@@ -17,7 +17,7 @@ REFRESH_TOKEN_EXPIRE_MINUTES = config("REFRESH_TOKEN_EXPIRE_MINUTES", default=60
 
 
 def jwt_create_token(subject: str, public_key: str = "", expires_minutes: int = 0) -> str:
-    """Create token when login with user."""
+    """UC-AUTH-01 Bước 5: Tạo JWT (gọi từ AuthService.login)."""
     expire = datetime.utcnow() + timedelta(
         minutes=expires_minutes if expires_minutes else int(ACCESS_TOKEN_EXPIRE_MINUTES))
 
@@ -41,7 +41,7 @@ def jwt_decode_token(access_token: str) -> Dict[str, Any]:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify 2 password when hash password."""
+    """UC-AUTH-01 Bước 4: So khớp mật khẩu bcrypt (gọi từ UserService.authenticate)."""
     try:
         # Kiểm tra nếu hashed_password là None hoặc rỗng
         if not hashed_password:

@@ -180,14 +180,11 @@ class ResourceService:
     async def upload_resource(self, file_upload: UploadFile, resource_create: ResourceCreate, user):
         """Define upload resource service (Removed Role Check)."""
         try:
-            print(f"📁 Reading file content...")
             content = await file_upload.read()
-            print(f"📁 File size: {len(content)} bytes")
             
             # Get file extension to determine folder
             file_extension = file_upload.filename.split('.')[-1].lower() if '.' in file_upload.filename else 'unknown'
-            print(f"🔍 Original filename: {file_upload.filename}")
-            print(f"🔍 Detected extension: {file_extension}")
+
             
             # Map extensions to folders
             folder_mapping = {
@@ -232,10 +229,10 @@ class ResourceService:
                 import time
                 timestamp = int(time.time())
                 resource_create_dict['name'] = f"{resource_create_dict['name']}_{timestamp}"
-                print(f"⚠️ Name conflict detected, adding timestamp: {resource_create_dict['name']}")
+                
             else:
-                print(f"✅ Name is unique: {resource_create_dict['name']}")  
-            print(f"📝 Resource data: {resource_create_dict}")
+                print(f"Name is unique: {resource_create_dict['name']}")  
+            print(f"Resource data: {resource_create_dict}")
 
             if not resource_create_dict.get("status_id"):
                 pending = db_session.query(models.ResourceStatus).filter(
@@ -251,17 +248,17 @@ class ResourceService:
                 os.makedirs(os.path.dirname(local_full_path), exist_ok=True)
                 with open(local_full_path, "wb") as f:
                     f.write(content)
-                print(f"💾 Saved file locally at: {local_full_path}")
+    
             except Exception as fs_error:
-                print(f"⚠️ Local file save failed: {str(fs_error)}")
+                print(f"Local file save failed: {str(fs_error)}")
 
             # Upload file lên S3 (nếu cấu hình đúng) - best effort
-            print(f"☁️ Uploading to S3 (best effort)...")
+            print(f"Uploading to S3 (best effort)...")
             try:
                 self.base_service.engine_s3.put_object(url.lstrip('/'), content)
-                print(f"✅ S3 upload successful")
+                print(f"S3 upload successful")
             except Exception as s3_error:
-                print(f"⚠️ S3 upload failed: {str(s3_error)}")
+                print(f"S3 upload failed: {str(s3_error)}")
 
             uploaded_file_metadata = self.base_service.engine_postgresql.create(models.Resource, resource_create_dict)
 
@@ -302,18 +299,18 @@ class ResourceService:
             try:
                 with open(local_path, "rb") as f:
                     content = f.read()
-                print(f"💾 Read file from local uploads: {local_path}")
+                print(f"Read file from local uploads: {local_path}")
             except Exception as fs_error:
-                print(f"⚠️ Local read failed, fallback to S3: {str(fs_error)}")
+                print(f"Local read failed, fallback to S3: {str(fs_error)}")
 
         # Nếu chưa có content, thử đọc từ S3
         if content is None:
             s3_key = file_url.lstrip("/")
             try:
                 content = self.base_service.engine_s3.get_object(s3_key)
-                print(f"☁️ Read file from S3: {s3_key}")
+                print(f"Read file from S3: {s3_key}")
             except Exception as s3_error:
-                print(f"❌ S3 get_object failed: {str(s3_error)}")
+                print(f"S3 get_object failed: {str(s3_error)}")
                 content = None
 
         if not content:
@@ -510,6 +507,7 @@ class ResourceService:
         self.file_repository.back_up(db_session, obj_id=resource.id)
         return self.file_repository.get(db_session, resource_id)
 
+    # ----- UC-RES-01: Cập nhật tài nguyên (Service) -----
     def update(
         self,
         db_session: Session,
@@ -517,7 +515,7 @@ class ResourceService:
         resource_update: ResourceUpdate,
         user: User,
     ) -> models.Resource:
-        """Update resource: owner, hoặc user có manage_resources / admin."""
+        """Bước 4–6: kiểm tra quyền → _persist_resource_update → PostgreSQL."""
         resource = self.file_repository.get(db_session, resource_id)
         if not resource:
             raise BEErrorCode.RESOURCE_NOT_FOUND.value

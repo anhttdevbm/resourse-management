@@ -17,6 +17,7 @@ export const authSlice = createSlice({
     initialState,
     reducers: {
         setAuthLogin: (state, action: PayloadAction<User | null>) => {
+            // UC-AUTH-01 Bước 7: Lưu phiên đăng nhập (Redux)
             state.isAuthenticated = true
             state.user = action.payload
         },

@@ -1,3 +1,7 @@
+/**
+ * UC-AUTH-02: Đăng ký (Frontend) — cùng luồng token/Redux như UC-AUTH-01 sau khi API thành công.
+ * Route: main.tsx /register → AuthService.register → POST /api/auth/user/register
+ */
 import { useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
