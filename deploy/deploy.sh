@@ -66,6 +66,7 @@ unset _secret_key
 log "Project: ${COMPOSE_PROJECT_NAME:-rms}"
 log "Public URL: ${PUBLIC_URL:-http://localhost}"
 log "Bootstrap admin: ${BOOTSTRAP_ADMIN_EMAIL:-<not set>}"
+log "Demo seed: ${SEED_DEMO_DATA:-true}"
 log "Ports: web=${HTTP_PORT:-1070} api=${API_HOST_PORT:-1071} db=${POSTGRES_HOST_PORT:-1072} minio=${MINIO_HOST_PORT:-1073} minio-ui=${MINIO_CONSOLE_HOST_PORT:-1074}"
 
 log "Building images..."
@@ -93,6 +94,10 @@ done
 
 log "Ensuring bootstrap admin (AllAccess)..."
 ${COMPOSE} --env-file product.env exec -T api python3 /app/scripts/bootstrap_admin.py || true
+
+log "Ensuring classification + demo seed data..."
+${COMPOSE} --env-file product.env exec -T api python3 /app/scripts/seed_classification_defaults.py || true
+${COMPOSE} --env-file product.env exec -T api python3 /app/scripts/seed_demo_data.py || true
 
 log "Service status:"
 ${COMPOSE} --env-file product.env ps

@@ -42,6 +42,40 @@ Mặc định local: `admin@localhost.dev` và `anhttdevbm@gmail.com`.
 
 User OAuth (Google): đăng nhập lần đầu → restart API (`docker compose restart api`) để được gán admin.
 
+### Demo seed data (tự động)
+
+Khi API khởi động, sau migration sẽ chạy `scripts/seed_demo_data.py` nếu `SEED_DEMO_DATA=true` (mặc định trong compose dev). Dữ liệu mô phỏng hệ thống đã vận hành ~3 tháng:
+
+| Nội dung | Số lượng (ước lượng) |
+|----------|----------------------|
+| User demo | 5 |
+| Tài nguyên | ~30 (Approved / Pending / Rejected) |
+| Lượt tải xuống | ~200+ (phân bố theo thời gian) |
+| Chia sẻ, yêu thích, bookmark | Có |
+| Thông báo, lịch sử tìm kiếm | Có |
+
+| Biến `.env` | Mô tả |
+|-------------|--------|
+| `SEED_DEMO_DATA` | `true` / `false` — bật/tắt seed demo |
+| `SEED_DEMO_PASSWORD` | Mật khẩu user demo (mặc định `Demo@2026!`) |
+
+**Tài khoản demo** (đăng nhập email/password):
+
+- `nguyen.van.a@demo.local` — Nguyễn Văn A
+- `tran.thi.b@demo.local` — Trần Thị B
+- `le.van.c@demo.local` — Lê Văn C
+- `pham.thi.d@demo.local` — Phạm Thị D
+- `hoang.van.e@demo.local` — Hoàng Văn E
+
+Mật khẩu: `Demo@2026!` (hoặc giá trị `SEED_DEMO_PASSWORD`).
+
+Seed chỉ chạy **một lần** (idempotent). Để seed lại từ đầu:
+
+```bash
+docker compose down -v   # xóa volume DB
+docker compose up --build
+```
+
 ### Default Credentials
 
 #### Database

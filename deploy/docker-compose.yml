@@ -95,6 +95,7 @@ services:
       ENV_FILE: /app/.env
       HOST_DB: db
       AWS_HOST: http://minio:9000
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
     volumes:
       - ./product.env:/app/.env:ro
       - api_uploads:/app/uploads

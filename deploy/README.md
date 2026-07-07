@@ -68,11 +68,41 @@ Mặc định trong `product.env`:
 
 Đăng nhập tại `/login` bằng email + mật khẩu trên.
 
+## Demo seed data (tự động)
+
+Sau migration, hệ thống cũng nạp dữ liệu demo (mô phỏng ~3 tháng vận hành) nếu `SEED_DEMO_DATA=true`:
+
+| Biến | Mô tả |
+|------|--------|
+| `SEED_DEMO_DATA` | `true` / `false` — bật/tắt seed demo (mặc định `true`) |
+| `SEED_DEMO_PASSWORD` | Mật khẩu user demo (mặc định `Demo@2026!`) |
+
+**Tài khoản demo** (email/password):
+
+- `nguyen.van.a@demo.local` — Nguyễn Văn A
+- `tran.thi.b@demo.local` — Trần Thị B
+- `le.van.c@demo.local` — Lê Văn C
+- `pham.thi.d@demo.local` — Phạm Thị D
+- `hoang.van.e@demo.local` — Hoàng Văn E
+
+Mật khẩu: `Demo@2026!` (hoặc `SEED_DEMO_PASSWORD`).
+
+Seed chỉ chạy **một lần** (idempotent). Để seed lại từ đầu:
+
+```bash
+cd deploy
+docker compose --env-file product.env down -v
+./deploy.sh
+```
+
+Tắt seed trên server production thật: đặt `SEED_DEMO_DATA=false` trong `product.env`.
+
 Chạy lại bootstrap thủ công:
 
 ```bash
 cd deploy
 docker compose --env-file product.env exec api python3 /app/scripts/bootstrap_admin.py
+docker compose --env-file product.env exec api python3 /app/scripts/seed_demo_data.py
 ```
 
 ## CI/CD (GitHub Actions)

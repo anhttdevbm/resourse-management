@@ -58,6 +58,7 @@ RUN echo '#!/bin/sh' > start.sh && \
     echo 'export PYTHONPATH=/app' >> start.sh && \
     echo 'python3 /app/scripts/bootstrap_admin.py || true' >> start.sh && \
     echo 'python3 /app/scripts/seed_classification_defaults.py || true' >> start.sh && \
+    echo 'python3 /app/scripts/seed_demo_data.py || true' >> start.sh && \
     echo 'cd /app/app' >> start.sh && \
     echo 'python3 main.py' >> start.sh && \
     chmod +x start.sh
