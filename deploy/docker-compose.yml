@@ -13,6 +13,7 @@ volumes:
   postgres_data:
   minio_data:
   api_uploads:
+  api_app_uploads:
 
 services:
   db:
@@ -99,6 +100,7 @@ services:
     volumes:
       - ./product.env:/app/.env:ro
       - api_uploads:/app/uploads
+      - api_app_uploads:/app/app/uploads
     ports:
       - "${API_HOST_PORT:-1071}:${PORT:-30111}"
     networks:

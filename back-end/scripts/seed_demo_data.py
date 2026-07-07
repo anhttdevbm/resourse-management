@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-Seed dữ liệu demo cho môi trường local — mô phỏng hệ thống đã vận hành ~3 tháng.
+Seed dữ liệu demo — mô phỏng hệ thống đã vận hành ~3 tháng, file tải được thật.
 
-Chạy tự động khi docker compose up (nếu SEED_DEMO_DATA=true).
-Idempotent: bỏ qua nếu đã seed (phát hiện qua user demo đầu tiên).
+Chạy tự động khi docker compose up (local + deploy) nếu SEED_DEMO_DATA=true.
+Idempotent: user/resource chỉ tạo lần đầu; file luôn được backfill nếu thiếu.
 
 Biến môi trường:
-  SEED_DEMO_DATA=true|false   — bật/tắt (mặc định: true khi ENV=DEV)
-  SEED_DEMO_PASSWORD          — mật khẩu user demo (mặc định: Demo@2026!)
+  SEED_DEMO_DATA=true|false
+  SEED_DEMO_PASSWORD=Demo@2026!
+  BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_EMAILS — user admin nhận dữ liệu seed
+  BOOTSTRAP_ADMIN_PASSWORD — tạo admin nếu chưa có
 """
 from __future__ import annotations
 
@@ -26,12 +28,22 @@ bootstrap_env.configure_env()
 import decouple
 from sqlalchemy import text
 
+from app.src.services.s3_connection import S3Storage
 from app.src.utils.connection.sql_connection import engine
 from app.src.utils.security import get_password_hash
+
+from scripts.seed_demo_files import (
+    ensure_resource_file,
+    local_file_exists,
+    resource_storage_paths,
+    s3_object_exists,
+    upload_seed_file,
+)
 
 _NS = uuid.NAMESPACE_DNS
 _MARKER_EMAIL = "nguyen.van.a@demo.local"
 _DEMO_PASSWORD_DEFAULT = "Demo@2026!"
+_DEFAULT_ADMIN_EMAIL = "anhttdevbm@gmail.com"
 
 _DEMO_USERS = [
     ("nguyen.van.a@demo.local", "Nguyễn Văn A"),
@@ -41,7 +53,8 @@ _DEMO_USERS = [
     ("hoang.van.e@demo.local", "Hoàng Văn E"),
 ]
 
-_REPOS = {
+_REPOS: dict[str, list[str]] = {
+    _DEFAULT_ADMIN_EMAIL: ["Kho quản trị hệ thống", "Bản phát hành production"],
     "nguyen.van.a@demo.local": ["Kho phát hành chính", "Bản beta nội bộ"],
     "tran.thi.b@demo.local": ["Backend builds", "API artifacts"],
     "le.van.c@demo.local": ["QA test packages", "Regression builds"],
@@ -49,7 +62,8 @@ _REPOS = {
     "hoang.van.e@demo.local": ["Infra releases", "Server images"],
 }
 
-_TAGS = {
+_TAGS: dict[str, list[str]] = {
+    _DEFAULT_ADMIN_EMAIL: ["admin", "release", "core"],
     "nguyen.van.a@demo.local": ["mobile", "release", "priority-high"],
     "tran.thi.b@demo.local": ["api", "backend", "microservice"],
     "le.van.c@demo.local": ["qa", "regression", "staging"],
@@ -59,6 +73,18 @@ _TAGS = {
 
 # (name, version, stage, platform, product_type, status, ext, owner_email, days_ago, repo_idx, tag_idx)
 _RESOURCES = [
+    # --- Admin anhttdevbm@gmail.com ---
+    ("RMS Admin Console Guide", "3.0", "Production", "Web", "Document", "Approved", "pdf", _DEFAULT_ADMIN_EMAIL, 4, 0, 0),
+    ("Platform Deployment Runbook", "2.1", "Production", "Web", "Document", "Approved", "md", _DEFAULT_ADMIN_EMAIL, 12, 0, 1),
+    ("Core API Release Pack", "3.2.1", "Production", "Linux", "Archive", "Approved", "zip", _DEFAULT_ADMIN_EMAIL, 9, 1, 0),
+    ("RMS Mobile Release APK", "3.0.0", "Production", "Android", "Mobile App", "Approved", "apk", _DEFAULT_ADMIN_EMAIL, 2, 0, 2),
+    ("Windows Admin Tool", "1.2.0", "Production", "Windows", "Desktop Software", "Approved", "exe", _DEFAULT_ADMIN_EMAIL, 7, 0, 0),
+    ("Brand Asset Pack 2026", "1.0", "Production", "Web", "Media", "Approved", "png", _DEFAULT_ADMIN_EMAIL, 18, 1, 1),
+    ("Staging Snapshot July", "2026.07", "Staging", "Linux", "Archive", "Approved", "zip", _DEFAULT_ADMIN_EMAIL, 3, 1, 1),
+    ("Security Policy Draft", "0.9", "Development", "Web", "Document", "Pending", "pdf", _DEFAULT_ADMIN_EMAIL, 1, 0, 2),
+    ("Executive Summary Q2", "2026.2", "Production", "Web", "Document", "Approved", "pdf", _DEFAULT_ADMIN_EMAIL, 25, 0, 0),
+    ("Infra Monitoring Bundle", "1.4", "Production", "Linux", "Archive", "Approved", "zip", _DEFAULT_ADMIN_EMAIL, 14, 1, 0),
+    # --- Demo users ---
     ("RMS Mobile Android 2.1.0", "2.1.0", "Production", "Android", "Mobile App", "Approved", "apk", "nguyen.van.a@demo.local", 2, 0, 0),
     ("RMS Mobile Android 2.0.8", "2.0.8", "Production", "Android", "Mobile App", "Approved", "apk", "nguyen.van.a@demo.local", 18, 0, 0),
     ("RMS Mobile Android 2.0.5", "2.0.5", "Staging", "Android", "Mobile App", "Approved", "apk", "nguyen.van.a@demo.local", 35, 1, 1),
@@ -100,21 +126,28 @@ _SEARCH_QUERIES = [
     ("ui kit", 3, 1),
     ("release notes", 2, 1),
     ("windows installer", 3, 1),
+    ("admin console", 4, 1),
+    ("deployment", 3, 1),
 ]
 
 _SHARES = [
-    # (resource_name, version, shared_with_email, can_edit)
     ("RMS Mobile Android 2.1.0", "2.1.0", "tran.thi.b@demo.local", False),
+    ("RMS Mobile Android 2.1.0", "2.1.0", _DEFAULT_ADMIN_EMAIL, False),
     ("HR Portal Windows", "1.4.2", "le.van.c@demo.local", False),
+    ("Core API Release Pack", "3.2.1", _DEFAULT_ADMIN_EMAIL, True),
     ("Dashboard UI Kit", "4.0", "nguyen.van.a@demo.local", False),
     ("API Gateway Config Pack", "3.2.1", "hoang.van.e@demo.local", True),
     ("QA Regression Suite Q2", "2026.2", "tran.thi.b@demo.local", False),
     ("Server Agent Linux", "2.3.0", "tran.thi.b@demo.local", False),
     ("Brand Guidelines 2026", "2.0", "pham.thi.d@demo.local", False),
     ("Promo Video Launch", "1.0", "nguyen.van.a@demo.local", False),
+    ("RMS Admin Console Guide", "3.0", "nguyen.van.a@demo.local", False),
 ]
 
 _FAVORITES = [
+    (_DEFAULT_ADMIN_EMAIL, "RMS Admin Console Guide", "3.0"),
+    (_DEFAULT_ADMIN_EMAIL, "Core API Release Pack", "3.2.1"),
+    (_DEFAULT_ADMIN_EMAIL, "RMS Mobile Release APK", "3.0.0"),
     ("nguyen.van.a@demo.local", "RMS Mobile Android 2.1.0", "2.1.0"),
     ("nguyen.van.a@demo.local", "Release Notes Q2", "2026.2"),
     ("tran.thi.b@demo.local", "HR Portal Windows", "1.4.2"),
@@ -130,6 +163,8 @@ _FAVORITES = [
 ]
 
 _BOOKMARKS = [
+    (_DEFAULT_ADMIN_EMAIL, "Security Policy Draft", "0.9", "Cần duyệt trước khi publish"),
+    (_DEFAULT_ADMIN_EMAIL, "Executive Summary Q2", "2026.2", None),
     ("nguyen.van.a@demo.local", "Internal API Spec", "3.0", "Tham khảo khi review API"),
     ("tran.thi.b@demo.local", "Auth Service Build", "1.8.0", "Chờ duyệt deploy"),
     ("le.van.c@demo.local", "UAT Test Report April", "1.0", None),
@@ -157,6 +192,21 @@ def _enabled() -> bool:
     return _cfg("ENV", "DEV").upper() in ("DEV", "DEVELOPMENT", "LOCAL")
 
 
+def _admin_emails() -> list[str]:
+    emails: list[str] = []
+    for key in ("BOOTSTRAP_ADMIN_EMAIL", "BOOTSTRAP_ADMIN_EMAILS"):
+        raw = _cfg(key)
+        if not raw:
+            continue
+        for part in raw.split(","):
+            email = part.strip()
+            if email and "@" in email and email not in emails:
+                emails.append(email)
+    if _DEFAULT_ADMIN_EMAIL not in emails:
+        emails.append(_DEFAULT_ADMIN_EMAIL)
+    return emails
+
+
 def _uid(key: str) -> uuid.UUID:
     return uuid.uuid5(_NS, f"rms-demo-{key}")
 
@@ -180,49 +230,98 @@ def _days_ago_ts(days: int) -> datetime:
     return (base - timedelta(days=days)).replace(hour=hour, minute=minute, second=0)
 
 
-def _ensure_users(conn, password_hash: str) -> dict[str, uuid.UUID]:
+def _get_s3() -> S3Storage | None:
+    host = _cfg("AWS_HOST")
+    key = _cfg("AWS_ACCESS_KEY_ID")
+    secret = _cfg("AWS_SECRET_ACCESS_KEY")
+    bucket = _cfg("AWS_BUCKET_NAME")
+    if not all([host, key, secret, bucket]):
+        print("  warn: thiếu cấu hình S3 — chỉ ghi file local")
+        return None
+    try:
+        return S3Storage(host, key, secret, bucket, _cfg("AWS_REGION", "ap-southeast-1"))
+    except Exception as exc:
+        print(f"  warn: không kết nối S3: {exc}")
+        return None
+
+
+def _lookup_user_id(conn, email: str) -> uuid.UUID | None:
+    row = conn.execute(
+        text("SELECT id FROM users WHERE email = :email AND is_deleted = false LIMIT 1"),
+        {"email": email},
+    ).fetchone()
+    return row[0] if row else None
+
+
+def _ensure_user(
+    conn,
+    email: str,
+    name: str,
+    password_hash: str | None,
+    created_days_ago: int,
+) -> uuid.UUID | None:
+    existing = _lookup_user_id(conn, email)
+    if existing:
+        return existing
+    if not password_hash:
+        return None
+    uid = _uid(f"user-{email}")
+    created = _days_ago_ts(created_days_ago)
+    conn.execute(
+        text(
+            """
+            INSERT INTO users (id, email, name, password, created_at, updated_at, is_deleted, is_locked)
+            VALUES (:id, :email, :name, :password, :created_at, :updated_at, false, false)
+            """
+        ),
+        {
+            "id": uid,
+            "email": email,
+            "name": name,
+            "password": password_hash,
+            "created_at": created,
+            "updated_at": created,
+        },
+    )
+    print(f"  + user: {name} ({email})")
+    return uid
+
+
+def _ensure_all_users(conn, demo_password_hash: str) -> dict[str, uuid.UUID]:
     user_ids: dict[str, uuid.UUID] = {}
+    admin_password = _cfg("BOOTSTRAP_ADMIN_PASSWORD")
+    admin_hash = get_password_hash(admin_password) if admin_password else None
+    admin_name = _cfg("BOOTSTRAP_ADMIN_NAME", "Admin")
+
+    for idx, email in enumerate(_admin_emails()):
+        uid = _ensure_user(conn, email, admin_name if email == _admin_emails()[0] else admin_name, admin_hash, 95 - idx)
+        if uid:
+            user_ids[email] = uid
+
     for email, name in _DEMO_USERS:
-        uid = _uid(f"user-{email}")
-        exists = conn.execute(
-            text("SELECT id FROM users WHERE email = :email LIMIT 1"),
-            {"email": email},
-        ).fetchone()
-        if exists:
-            user_ids[email] = exists[0]
-            continue
-        created = _days_ago_ts(90 - _DEMO_USERS.index((email, name)) * 5)
-        conn.execute(
-            text(
-                """
-                INSERT INTO users (id, email, name, password, created_at, updated_at, is_deleted, is_locked)
-                VALUES (:id, :email, :name, :password, :created_at, :updated_at, false, false)
-                """
-            ),
-            {
-                "id": uid,
-                "email": email,
-                "name": name,
-                "password": password_hash,
-                "created_at": created,
-                "updated_at": created,
-            },
+        uid = _ensure_user(
+            conn,
+            email,
+            name,
+            demo_password_hash,
+            90 - _DEMO_USERS.index((email, name)) * 5,
         )
-        user_ids[email] = uid
-        print(f"  + user: {name} ({email})")
+        if uid:
+            user_ids[email] = uid
+
     return user_ids
 
 
 def _ensure_repos(conn, user_ids: dict[str, uuid.UUID]) -> dict[str, list[uuid.UUID]]:
     repo_ids: dict[str, list[uuid.UUID]] = {}
     for email, names in _REPOS.items():
+        if email not in user_ids:
+            continue
         repo_ids[email] = []
         for idx, repo_name in enumerate(names):
             rid = _uid(f"repo-{email}-{idx}")
             exists = conn.execute(
-                text(
-                    "SELECT id FROM package_repos WHERE user_id = :uid AND name = :name LIMIT 1"
-                ),
+                text("SELECT id FROM package_repos WHERE user_id = :uid AND name = :name LIMIT 1"),
                 {"uid": user_ids[email], "name": repo_name},
             ).fetchone()
             if exists:
@@ -236,13 +335,7 @@ def _ensure_repos(conn, user_ids: dict[str, uuid.UUID]) -> dict[str, list[uuid.U
                     VALUES (:id, :user_id, :name, :created_at, :updated_at, false)
                     """
                 ),
-                {
-                    "id": rid,
-                    "user_id": user_ids[email],
-                    "name": repo_name,
-                    "created_at": ts,
-                    "updated_at": ts,
-                },
+                {"id": rid, "user_id": user_ids[email], "name": repo_name, "created_at": ts, "updated_at": ts},
             )
             repo_ids[email].append(rid)
     return repo_ids
@@ -251,13 +344,13 @@ def _ensure_repos(conn, user_ids: dict[str, uuid.UUID]) -> dict[str, list[uuid.U
 def _ensure_tags(conn, user_ids: dict[str, uuid.UUID]) -> dict[str, list[uuid.UUID]]:
     tag_ids: dict[str, list[uuid.UUID]] = {}
     for email, names in _TAGS.items():
+        if email not in user_ids:
+            continue
         tag_ids[email] = []
         for idx, tag_name in enumerate(names):
             tid = _uid(f"tag-{email}-{idx}")
             exists = conn.execute(
-                text(
-                    "SELECT id FROM resource_tags WHERE user_id = :uid AND name = :name LIMIT 1"
-                ),
+                text("SELECT id FROM resource_tags WHERE user_id = :uid AND name = :name LIMIT 1"),
                 {"uid": user_ids[email], "name": tag_name},
             ).fetchone()
             if exists:
@@ -271,13 +364,7 @@ def _ensure_tags(conn, user_ids: dict[str, uuid.UUID]) -> dict[str, list[uuid.UU
                     VALUES (:id, :user_id, :name, :created_at, :updated_at, false)
                     """
                 ),
-                {
-                    "id": tid,
-                    "user_id": user_ids[email],
-                    "name": tag_name,
-                    "created_at": ts,
-                    "updated_at": ts,
-                },
+                {"id": tid, "user_id": user_ids[email], "name": tag_name, "created_at": ts, "updated_at": ts},
             )
             tag_ids[email].append(tid)
     return tag_ids
@@ -285,6 +372,7 @@ def _ensure_tags(conn, user_ids: dict[str, uuid.UUID]) -> dict[str, list[uuid.UU
 
 def _ensure_resources(
     conn,
+    s3: S3Storage | None,
     user_ids: dict[str, uuid.UUID],
     repo_ids: dict[str, list[uuid.UUID]],
     tag_ids: dict[str, list[uuid.UUID]],
@@ -293,18 +381,24 @@ def _ensure_resources(
     resource_ids: dict[str, uuid.UUID] = {}
     for row in _RESOURCES:
         name, version, stage, platform, ptype, status, ext, owner, days_ago, repo_idx, tag_idx = row
+        if owner not in user_ids or owner not in repo_ids or owner not in tag_ids:
+            continue
         key = _resource_key(name, version)
         rid = _uid(f"resource-{key}")
         exists = conn.execute(
-            text("SELECT id FROM resources WHERE name = :name AND version = :version LIMIT 1"),
+            text("SELECT id, url FROM resources WHERE name = :name AND version = :version LIMIT 1"),
             {"name": name, "version": version},
         ).fetchone()
         if exists:
             resource_ids[key] = exists[0]
+            url = ensure_resource_file(s3, exists[1] or "", name, version, ext)
+            if url != (exists[1] or ""):
+                conn.execute(text("UPDATE resources SET url = :url WHERE id = :id"), {"url": url, "id": exists[0]})
             continue
 
         created = _days_ago_ts(days_ago)
-        url = f"/uploads/demo/{version.replace('.', '_')}_{name.replace(' ', '_')}.{ext}"
+        url, _ = resource_storage_paths(name, version, ext)
+        url = ensure_resource_file(s3, url, name, version, ext)
         download_count = random.randint(3, 45) if status == "Approved" else random.randint(0, 3)
 
         conn.execute(
@@ -317,7 +411,7 @@ def _ensure_resources(
                 ) VALUES (
                     :id, :name, :version, :stage_id, :status_id, :platform_id,
                     :product_type_id, :repo_id, :user_id, :created_at, false,
-                    :url, :download_count
+                    :url, 0
                 )
                 """
             ),
@@ -333,7 +427,6 @@ def _ensure_resources(
                 "user_id": user_ids[owner],
                 "created_at": created,
                 "url": url,
-                "download_count": 0,
             },
         )
 
@@ -343,7 +436,6 @@ def _ensure_resources(
                 """
                 INSERT INTO resource_has_resource_tags (resource_id, resource_tag_id, is_deleted)
                 VALUES (:resource_id, :tag_id, false)
-                ON CONFLICT DO NOTHING
                 """
             ),
             {"resource_id": rid, "tag_id": tag_id},
@@ -355,9 +447,41 @@ def _ensure_resources(
             text("UPDATE resources SET download_count = :cnt WHERE id = :id"),
             {"cnt": download_count, "id": rid},
         )
-        print(f"  + resource: {name} v{version} ({status})")
+        print(f"  + resource: {name} v{version} ({status}) [{owner}]")
 
     return resource_ids
+
+
+def _backfill_all_files(conn, s3: S3Storage | None) -> int:
+    rows = conn.execute(
+        text(
+            """
+            SELECT name, version, url
+            FROM resources
+            WHERE is_deleted = false AND url IS NOT NULL AND url <> ''
+            """
+        )
+    ).fetchall()
+    fixed = 0
+    for name, version, url in rows:
+        ext = (url.rsplit(".", 1)[-1].lower() if url and "." in url else "txt")
+        canonical_url, canonical_key = resource_storage_paths(name, version, ext)
+        needs_file = not (
+            local_file_exists(canonical_key)
+            and (s3 is None or s3_object_exists(s3, canonical_key))
+        )
+        needs_url_update = url != canonical_url
+        if not needs_file and not needs_url_update:
+            continue
+        ensure_resource_file(s3, canonical_url, name, version, ext)
+        if needs_url_update:
+            conn.execute(
+                text("UPDATE resources SET url = :url WHERE name = :name AND version = :version"),
+                {"url": canonical_url, "name": name, "version": version},
+            )
+        fixed += 1
+        print(f"  + file backfill: {canonical_key}")
+    return fixed
 
 
 def _seed_downloads(
@@ -375,36 +499,40 @@ def _seed_downloads(
         dl_user = random.choice(all_users)
         offset_days = random.randint(0, max(1, (datetime.now() - since).days))
         dl_at = since + timedelta(days=offset_days, hours=random.randint(0, 10))
+        exists = conn.execute(
+            text("SELECT 1 FROM download_logs WHERE id = :id"),
+            {"id": dl_id},
+        ).fetchone()
+        if exists:
+            continue
         conn.execute(
             text(
                 """
                 INSERT INTO download_logs (id, resource_id, user_id, downloaded_at)
                 VALUES (:id, :resource_id, :user_id, :downloaded_at)
-                ON CONFLICT DO NOTHING
                 """
             ),
-            {
-                "id": dl_id,
-                "resource_id": resource_id,
-                "user_id": dl_user,
-                "downloaded_at": dl_at,
-            },
+            {"id": dl_id, "resource_id": resource_id, "user_id": dl_user, "downloaded_at": dl_at},
         )
 
 
 def _ensure_shares(conn, user_ids: dict[str, uuid.UUID], resource_ids: dict[str, uuid.UUID]) -> None:
     for name, version, shared_email, can_edit in _SHARES:
+        if shared_email not in user_ids:
+            continue
         key = _resource_key(name, version)
         res_id = resource_ids.get(key)
         if not res_id:
             continue
         sid = _uid(f"share-{key}-{shared_email}")
+        exists = conn.execute(text("SELECT 1 FROM resource_shares WHERE id = :id"), {"id": sid}).fetchone()
+        if exists:
+            continue
         conn.execute(
             text(
                 """
                 INSERT INTO resource_shares (id, resource_id, shared_with_user_id, can_edit, created_at)
                 VALUES (:id, :resource_id, :user_id, :can_edit, :created_at)
-                ON CONFLICT DO NOTHING
                 """
             ),
             {
@@ -419,17 +547,21 @@ def _ensure_shares(conn, user_ids: dict[str, uuid.UUID], resource_ids: dict[str,
 
 def _ensure_favorites(conn, user_ids: dict[str, uuid.UUID], resource_ids: dict[str, uuid.UUID]) -> None:
     for email, name, version in _FAVORITES:
+        if email not in user_ids:
+            continue
         key = _resource_key(name, version)
         res_id = resource_ids.get(key)
         if not res_id:
             continue
         fid = _uid(f"fav-{email}-{key}")
+        exists = conn.execute(text("SELECT 1 FROM user_favorites WHERE id = :id"), {"id": fid}).fetchone()
+        if exists:
+            continue
         conn.execute(
             text(
                 """
                 INSERT INTO user_favorites (id, user_id, resource_id, created_at)
                 VALUES (:id, :user_id, :resource_id, :created_at)
-                ON CONFLICT DO NOTHING
                 """
             ),
             {
@@ -443,17 +575,21 @@ def _ensure_favorites(conn, user_ids: dict[str, uuid.UUID], resource_ids: dict[s
 
 def _ensure_bookmarks(conn, user_ids: dict[str, uuid.UUID], resource_ids: dict[str, uuid.UUID]) -> None:
     for email, name, version, note in _BOOKMARKS:
+        if email not in user_ids:
+            continue
         key = _resource_key(name, version)
         res_id = resource_ids.get(key)
         if not res_id:
             continue
         bid = _uid(f"bm-{email}-{key}")
+        exists = conn.execute(text("SELECT 1 FROM user_bookmarks WHERE id = :id"), {"id": bid}).fetchone()
+        if exists:
+            continue
         conn.execute(
             text(
                 """
                 INSERT INTO user_bookmarks (id, user_id, resource_id, note, created_at)
                 VALUES (:id, :user_id, :resource_id, :note, :created_at)
-                ON CONFLICT DO NOTHING
                 """
             ),
             {
@@ -472,12 +608,14 @@ def _ensure_search_history(conn, user_ids: dict[str, uuid.UUID]) -> None:
         email = emails[idx % len(emails)]
         qkey = query.lower().strip()
         sid = _uid(f"search-{email}-{qkey}")
+        exists = conn.execute(text("SELECT 1 FROM search_history WHERE id = :id"), {"id": sid}).fetchone()
+        if exists:
+            continue
         conn.execute(
             text(
                 """
                 INSERT INTO search_history (id, user_id, query, query_key, resource_count, user_count, searched_at)
                 VALUES (:id, :user_id, :query, :query_key, :resource_count, :user_count, :searched_at)
-                ON CONFLICT DO NOTHING
                 """
             ),
             {
@@ -492,39 +630,32 @@ def _ensure_search_history(conn, user_ids: dict[str, uuid.UUID]) -> None:
         )
 
 
-def _ensure_notifications(conn, user_ids: dict[str, uuid.UUID], admin_id: uuid.UUID | None) -> None:
+def _ensure_notifications(conn, user_ids: dict[str, uuid.UUID]) -> None:
     notifs = [
-        ("nguyen.van.a@demo.local", "Phiên bản mới đã phê duyệt", "RMS Mobile Android v2.1.0 đã được phê duyệt và sẵn sàng phát hành.", "resource", True, 5),
-        ("tran.thi.b@demo.local", "Tài nguyên được chia sẻ", "Nguyễn Văn A đã chia sẻ RMS Mobile Android v2.1.0 với bạn.", "share", False, 3),
+        (_DEFAULT_ADMIN_EMAIL, "Chào mừng quản trị viên", "Dữ liệu demo đã sẵn sàng — 10+ tài nguyên thuộc tài khoản của bạn.", "system", False, 0),
+        (_DEFAULT_ADMIN_EMAIL, "Tài nguyên chờ duyệt", "Security Policy Draft v0.9 đang chờ phê duyệt.", "review", False, 1),
+        (_DEFAULT_ADMIN_EMAIL, "Phát hành mới", "RMS Mobile Release APK v3.0.0 đã được phê duyệt.", "resource", True, 2),
+        ("nguyen.van.a@demo.local", "Phiên bản mới đã phê duyệt", "RMS Mobile Android v2.1.0 đã sẵn sàng phát hành.", "resource", True, 5),
+        ("tran.thi.b@demo.local", "Tài nguyên được chia sẻ", "Admin đã chia sẻ RMS Mobile Android v2.1.0 với bạn.", "share", False, 3),
         ("le.van.c@demo.local", "Chờ kiểm duyệt", "Smoke Test APK v1.0.0-rc3 đang chờ phê duyệt.", "review", False, 2),
         ("pham.thi.d@demo.local", "Tải xuống thành công", "Promo Video Launch đã được tải 12 lần tuần này.", "download", True, 8),
-        ("hoang.van.e@demo.local", "Cập nhật hệ thống", "Docker Compose Stack v1.1 đã được deploy lên staging.", "system", True, 12),
-        ("tran.thi.b@demo.local", "Yêu cầu duyệt", "Auth Service Build v1.8.0 cần được review trước khi deploy.", "review", False, 1),
-        ("le.van.c@demo.local", "Báo cáo QA", "UAT Test Report April đã sẵn sàng để xem.", "resource", True, 20),
-        ("nguyen.van.a@demo.local", "Nhắc nhở", "Còn 2 tài nguyên đang chờ phê duyệt trong kho của bạn.", "system", False, 0),
+        ("hoang.van.e@demo.local", "Cập nhật hệ thống", "Docker Compose Stack v1.1 đã deploy lên staging.", "system", True, 12),
     ]
-    if admin_id:
-        notifs.append(
-            (None, "Báo cáo hệ thống", "Demo data đã được nạp — 5 user, ~30 tài nguyên, lịch sử 3 tháng.", "system", False, 0)
-        )
-
     for idx, item in enumerate(notifs):
         email, title, message, ntype, is_read, days_ago = item
-        target = admin_id if email is None else user_ids.get(email or "")
+        target = user_ids.get(email)
         if not target:
             continue
-        nid = _uid(f"notif-{target}-{idx}")
-        created = _days_ago_ts(days_ago)
+        nid = _uid(f"notif-{email}-{idx}")
+        exists = conn.execute(text("SELECT 1 FROM notifications WHERE id = :id"), {"id": nid}).fetchone()
+        if exists:
+            continue
         conn.execute(
             text(
                 """
                 INSERT INTO notifications (
                     id, user_id, title, message, type, source, is_read, created_at, is_deleted
-                )
-                SELECT :id, :user_id, :title, :message, :type, 'seed', :is_read, :created_at, false
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM notifications WHERE id = :id
-                )
+                ) VALUES (:id, :user_id, :title, :message, :type, 'seed', :is_read, :created_at, false)
                 """
             ),
             {
@@ -534,9 +665,40 @@ def _ensure_notifications(conn, user_ids: dict[str, uuid.UUID], admin_id: uuid.U
                 "message": message,
                 "type": ntype,
                 "is_read": is_read,
-                "created_at": created,
+                "created_at": _days_ago_ts(days_ago),
             },
         )
+
+
+def _load_catalog(conn) -> dict[str, dict[str, uuid.UUID]] | None:
+    stages: dict[str, uuid.UUID] = {}
+    platforms: dict[str, uuid.UUID] = {}
+    product_types: dict[str, uuid.UUID] = {}
+    statuses: dict[str, uuid.UUID] = {}
+    for stage in ("Development", "Staging", "Production"):
+        sid = _lookup_id(conn, "resource_stages", stage)
+        if sid:
+            stages[stage] = sid
+    for platform in ("Android", "Windows", "Linux", "macOS", "Web"):
+        pid = _lookup_id(conn, "resource_platforms", platform)
+        if pid:
+            platforms[platform] = pid
+    for ptype in ("Mobile App", "Desktop Software", "Document", "Archive", "Media"):
+        tid = _lookup_id(conn, "product_types", ptype)
+        if tid:
+            product_types[ptype] = tid
+    for status in ("Pending", "Approved", "Rejected"):
+        sid = _lookup_id(conn, "resource_statuss", status)
+        if sid:
+            statuses[status] = sid
+    if not all([stages, platforms, product_types, statuses]):
+        return None
+    return {
+        "stages": stages,
+        "platforms": platforms,
+        "product_types": product_types,
+        "statuses": statuses,
+    }
 
 
 def main() -> None:
@@ -545,71 +707,47 @@ def main() -> None:
         return
 
     random.seed(42)
+    s3 = _get_s3()
 
     with engine.begin() as conn:
-        marker = conn.execute(
-            text("SELECT 1 FROM users WHERE email = :email LIMIT 1"),
-            {"email": _MARKER_EMAIL},
-        ).fetchone()
-        if marker:
-            print("Demo data already seeded — skip.")
-            return
-
-        print("Seeding demo data (mô phỏng ~3 tháng vận hành)...")
-
-        stages = {}
-        platforms = {}
-        product_types = {}
-        statuses = {}
-        for stage in ("Development", "Staging", "Production"):
-            sid = _lookup_id(conn, "resource_stages", stage)
-            if sid:
-                stages[stage] = sid
-        for platform in ("Android", "Windows", "Linux", "macOS", "Web"):
-            pid = _lookup_id(conn, "resource_platforms", platform)
-            if pid:
-                platforms[platform] = pid
-        for ptype in ("Mobile App", "Desktop Software", "Document", "Archive", "Media"):
-            tid = _lookup_id(conn, "product_types", ptype)
-            if tid:
-                product_types[ptype] = tid
-        for status in ("Pending", "Approved", "Rejected"):
-            sid = _lookup_id(conn, "resource_statuss", status)
-            if sid:
-                statuses[status] = sid
-
-        if not all([stages, platforms, product_types, statuses]):
+        catalog = _load_catalog(conn)
+        if not catalog:
             print("Skip demo seed: catalog chưa đủ (chạy migration + seed_classification_defaults trước).")
             return
 
-        catalog = {
-            "stages": stages,
-            "platforms": platforms,
-            "product_types": product_types,
-            "statuses": statuses,
-        }
+        demo_password = _cfg("SEED_DEMO_PASSWORD", _DEMO_PASSWORD_DEFAULT)
+        demo_password_hash = get_password_hash(demo_password)
 
-        password = _cfg("SEED_DEMO_PASSWORD", _DEMO_PASSWORD_DEFAULT)
-        password_hash = get_password_hash(password)
+        full_seed = conn.execute(
+            text("SELECT 1 FROM users WHERE email = :email LIMIT 1"),
+            {"email": _MARKER_EMAIL},
+        ).fetchone() is None
 
-        admin_row = conn.execute(
-            text("SELECT id FROM users WHERE is_deleted = false ORDER BY created_at LIMIT 1")
-        ).fetchone()
-        admin_id = admin_row[0] if admin_row else None
+        if full_seed:
+            print("Seeding demo data (mô phỏng ~3 tháng vận hành + file thật)...")
+        else:
+            print("Demo users đã có — bổ sung admin + backfill file...")
 
-        user_ids = _ensure_users(conn, password_hash)
+        user_ids = _ensure_all_users(conn, demo_password_hash)
         repo_ids = _ensure_repos(conn, user_ids)
         tag_ids = _ensure_tags(conn, user_ids)
-        resource_ids = _ensure_resources(conn, user_ids, repo_ids, tag_ids, catalog)
-        _ensure_shares(conn, user_ids, resource_ids)
-        _ensure_favorites(conn, user_ids, resource_ids)
-        _ensure_bookmarks(conn, user_ids, resource_ids)
-        _ensure_search_history(conn, user_ids)
-        _ensure_notifications(conn, user_ids, admin_id)
+        resource_ids = _ensure_resources(conn, s3, user_ids, repo_ids, tag_ids, catalog)
+
+        if full_seed:
+            _ensure_shares(conn, user_ids, resource_ids)
+            _ensure_favorites(conn, user_ids, resource_ids)
+            _ensure_bookmarks(conn, user_ids, resource_ids)
+            _ensure_search_history(conn, user_ids)
+        _ensure_notifications(conn, user_ids)
+
+        fixed = _backfill_all_files(conn, s3)
+        if fixed:
+            print(f"  Backfilled {fixed} file(s).")
 
     print("Demo seed OK.")
+    admins = ", ".join(_admin_emails())
+    print(f"  Admin seed: {admins}")
     print(f"  Demo users password: {_cfg('SEED_DEMO_PASSWORD', _DEMO_PASSWORD_DEFAULT)}")
-    print("  Ví dụ đăng nhập: nguyen.van.a@demo.local")
 
 
 if __name__ == "__main__":
