@@ -42,6 +42,7 @@ FROM setup_env as server_run
 # Copy app source code
 COPY app/ ./app/
 COPY migration/ ./migration/
+COPY scripts/ ./scripts/
 
 # .env is mounted at runtime via docker-compose (back-end/.env -> /app/.env)
 # Create start script with proper line endings
@@ -52,8 +53,11 @@ RUN echo '#!/bin/sh' > start.sh && \
     echo '  echo "Missing $ENV_PATH — copy back-end/.env or cicd/config/.env.sample"' >> start.sh && \
     echo '  exit 1' >> start.sh && \
     echo 'fi' >> start.sh && \
+    echo 'until pg_isready -h "${HOST_DB:-db}" -p "${PORT_DB:-5432}" -U "${USERNAME_DB:-admin}"; do sleep 2; done' >> start.sh && \
     echo 'cd migration && alembic upgrade head' >> start.sh && \
     echo 'export PYTHONPATH=/app' >> start.sh && \
+    echo 'python3 /app/scripts/bootstrap_admin.py || true' >> start.sh && \
+    echo 'python3 /app/scripts/seed_classification_defaults.py || true' >> start.sh && \
     echo 'cd /app/app' >> start.sh && \
     echo 'python3 main.py' >> start.sh && \
     chmod +x start.sh

@@ -40,7 +40,8 @@ class AutoClassificationRuleService:
     def rule_to_dict(self, r: models.AutoClassificationRule) -> Dict[str, Any]:
         return {
             "id": str(r.id),
-            "user_id": str(r.user_id),
+            "user_id": str(r.user_id) if r.user_id else None,
+            "is_system": bool(getattr(r, "is_system", False)),
             "sort_order": r.sort_order,
             "enabled": r.enabled,
             "title": r.title,
@@ -134,12 +135,16 @@ class AutoClassificationRuleService:
                 raise BEErrorCode.PACKAGE_REPOSITORY_NOT_FOUND.value
 
     def list_for_user(self, session: Session, user_id: uuid.UUID) -> List[Dict[str, Any]]:
-        rows = self.repo.get_all_by_user(session, user_id)
+        rows = self.repo.get_effective_rules(session, user_id)
         return [self.rule_to_dict(r) for r in rows]
 
     def get_owned(self, session: Session, rule_id: uuid.UUID, user_id: uuid.UUID) -> models.AutoClassificationRule:
         r = self.repo.get(session, rule_id)
-        if not r or str(r.user_id) != str(user_id):
+        if not r:
+            raise BEErrorCode.AUTO_CLASSIFICATION_RULE_NOT_FOUND.value
+        if getattr(r, "is_system", False):
+            raise BEErrorCode.USER_NOT_PERMISSION.value
+        if str(r.user_id) != str(user_id):
             raise BEErrorCode.AUTO_CLASSIFICATION_RULE_NOT_FOUND.value
         return r
 
@@ -231,6 +236,7 @@ class AutoClassificationRuleService:
         try:
             session.query(models.AutoClassificationRule).filter(
                 models.AutoClassificationRule.user_id == user_id,
+                models.AutoClassificationRule.is_system.is_(False),
                 models.AutoClassificationRule.is_deleted.is_(False),
             ).update({"is_deleted": True}, synchronize_session=False)
             for i, item in enumerate(body.rules):

@@ -107,10 +107,46 @@ export interface DownloadStatistics {
   peak_downloads: number;
   time_series: Array<{
     date: string;
-    label: string;
     downloads: number;
   }>;
 }
+
+export interface UploadStatistics {
+  period: string;
+  start_date: string;
+  end_date: string;
+  total_uploads: number;
+  average_uploads: number;
+  peak_uploads: number;
+  time_series: Array<{
+    date: string;
+    uploads: number;
+  }>;
+}
+
+export interface UserStatistics {
+  period: string;
+  start_date: string;
+  end_date: string;
+  total_users: number;
+  new_users_today: number;
+  locked_users: number;
+  admin_users: number;
+  active_downloaders: number;
+  registrations: Array<{
+    date: string;
+    registrations: number;
+  }>;
+}
+
+export interface BreakdownItem {
+  name: string;
+  count: number;
+  percentage: number;
+  color: string;
+}
+
+export type ReportPeriod = '1d' | '7d' | '30d' | '90d' | '1y';
 
 export interface DownloadStatisticsResponse {
   code: string;
@@ -233,7 +269,7 @@ export const StatisticsService = {
     }
   },
 
-  async getDownloadStatistics(period: string = '7d'): Promise<DownloadStatistics> {
+  async getDownloadStatistics(period: ReportPeriod = '7d'): Promise<DownloadStatistics> {
     try {
       console.log(`🔄 Calling download statistics API (period: ${period})...`);
       const response = await apiCall.get<DownloadStatisticsResponse>(
@@ -250,5 +286,53 @@ export const StatisticsService = {
       console.error('❌ Download Statistics API Error:', error);
       throw error;
     }
-  }
+  },
+
+  async getUploadStatistics(period: ReportPeriod = '7d'): Promise<UploadStatistics> {
+    const response = await apiCall.get<{ code: string; data: UploadStatistics; message?: string }>(
+      `/resource-management/statistics/uploads?period=${period}`
+    );
+    if (response.data.code === 'BE0000') return response.data.data;
+    throw new Error(response.data.message || 'Failed to get upload statistics');
+  },
+
+  async getUserStatistics(period: ReportPeriod = '30d'): Promise<UserStatistics> {
+    const response = await apiCall.get<{ code: string; data: UserStatistics; message?: string }>(
+      `/resource-management/statistics/users?period=${period}`
+    );
+    if (response.data.code === 'BE0000') return response.data.data;
+    throw new Error(response.data.message || 'Failed to get user statistics');
+  },
+
+  async getResourceStatusBreakdown(): Promise<BreakdownItem[]> {
+    const response = await apiCall.get<{ code: string; data: BreakdownItem[]; message?: string }>(
+      '/resource-management/statistics/resource-status'
+    );
+    if (response.data.code === 'BE0000') return response.data.data;
+    throw new Error(response.data.message || 'Failed to get resource status breakdown');
+  },
+
+  async getPlatformBreakdown(): Promise<BreakdownItem[]> {
+    const response = await apiCall.get<{ code: string; data: BreakdownItem[]; message?: string }>(
+      '/resource-management/statistics/platforms'
+    );
+    if (response.data.code === 'BE0000') return response.data.data;
+    throw new Error(response.data.message || 'Failed to get platform breakdown');
+  },
+
+  async getProductTypeBreakdown(): Promise<BreakdownItem[]> {
+    const response = await apiCall.get<{ code: string; data: BreakdownItem[]; message?: string }>(
+      '/resource-management/statistics/product-types'
+    );
+    if (response.data.code === 'BE0000') return response.data.data;
+    throw new Error(response.data.message || 'Failed to get product type breakdown');
+  },
+
+  async getStageBreakdown(): Promise<BreakdownItem[]> {
+    const response = await apiCall.get<{ code: string; data: BreakdownItem[]; message?: string }>(
+      '/resource-management/statistics/stages'
+    );
+    if (response.data.code === 'BE0000') return response.data.data;
+    throw new Error(response.data.message || 'Failed to get stage breakdown');
+  },
 };

@@ -298,11 +298,11 @@ const CategoryAutoClassification: React.FC = () => {
   };
 
   const moveRule = async (id: string, dir: -1 | 1) => {
-    const sorted = [...rules].sort((a, b) => a.sortOrder - b.sortOrder);
-    const idx = sorted.findIndex((r) => r.id === id);
+    const userOnly = [...rules].filter((r) => !r.isSystem).sort((a, b) => a.sortOrder - b.sortOrder);
+    const idx = userOnly.findIndex((r) => r.id === id);
     const j = idx + dir;
-    if (idx < 0 || j < 0 || j >= sorted.length) return;
-    const swapped = [...sorted];
+    if (idx < 0 || j < 0 || j >= userOnly.length) return;
+    const swapped = [...userOnly];
     [swapped[idx], swapped[j]] = [swapped[j], swapped[idx]];
     const orderedIds = swapped.map((r) => r.id);
     setActionLoading(true);
@@ -669,6 +669,9 @@ const CategoryAutoClassification: React.FC = () => {
 
         {tab === 'rules' && (
           <>
+            <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              Quy tắc <strong>Hệ thống</strong> tự chạy khi upload (theo phần mở rộng file). Bạn có thể thêm quy tắc riêng bên dưới — quy tắc user được ưu tiên sau quy tắc hệ thống nếu cùng khớp.
+            </div>
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
               <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
                 <div className="flex-1 relative max-w-md">
@@ -804,7 +807,10 @@ const CategoryAutoClassification: React.FC = () => {
                                     type="button"
                                     title="Lên"
                                     onClick={() => moveRule(r.id, -1)}
-                                    className="p-1.5 rounded border border-gray-200 hover:bg-gray-100 text-gray-600"
+                                    disabled={r.isSystem}
+                                    className={`p-1.5 rounded border border-gray-200 text-gray-600 ${
+                                      r.isSystem ? 'opacity-30 cursor-not-allowed' : 'hover:bg-gray-100'
+                                    }`}
                                   >
                                     <FaArrowUp className="w-3 h-3" />
                                   </button>
@@ -812,7 +818,10 @@ const CategoryAutoClassification: React.FC = () => {
                                     type="button"
                                     title="Xuống"
                                     onClick={() => moveRule(r.id, 1)}
-                                    className="p-1.5 rounded border border-gray-200 hover:bg-gray-100 text-gray-600"
+                                    disabled={r.isSystem}
+                                    className={`p-1.5 rounded border border-gray-200 text-gray-600 ${
+                                      r.isSystem ? 'opacity-30 cursor-not-allowed' : 'hover:bg-gray-100'
+                                    }`}
                                   >
                                     <FaArrowDown className="w-3 h-3" />
                                   </button>
@@ -821,10 +830,11 @@ const CategoryAutoClassification: React.FC = () => {
                               <td className="px-3 py-3">
                                 <button
                                   type="button"
-                                  onClick={() => toggleEnabled(r)}
+                                  onClick={() => !r.isSystem && toggleEnabled(r)}
+                                  disabled={r.isSystem}
                                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                                     r.enabled ? 'bg-blue-600' : 'bg-gray-300'
-                                  }`}
+                                  } ${r.isSystem ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                   <span
                                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -834,29 +844,46 @@ const CategoryAutoClassification: React.FC = () => {
                                 </button>
                               </td>
                               <td className="px-4 py-3">
-                                <p className="text-sm font-medium text-gray-900">{r.title}</p>
-                                <p className="text-xs text-gray-500 mt-0.5">{summarizeRule(r)}</p>
+                                <p className="text-sm font-medium text-gray-900 flex items-center gap-2 flex-wrap">
+                                  {r.title}
+                                  {r.isSystem && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                      Hệ thống
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  {r.isSystem ? 'Tự áp dụng khi upload · ' : ''}
+                                  {summarizeRule(r)}
+                                </p>
                               </td>
                               <td className="px-4 py-3 text-xs text-gray-700 max-w-xs">
                                 {assigns.length ? assigns.join(' · ') : '—'}
                               </td>
                               <td className="px-4 py-3 text-right whitespace-nowrap">
-                                <button
-                                  type="button"
-                                  onClick={() => openEdit(r)}
-                                  className="inline-flex items-center gap-1 px-2 py-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-sm mr-1"
-                                >
-                                  <FaEdit className="w-3.5 h-3.5" />
-                                  Sửa
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setDeleteId(r.id)}
-                                  className="inline-flex items-center gap-1 px-2 py-1.5 text-red-600 hover:bg-red-50 rounded-lg text-sm"
-                                >
-                                  <FaTrash className="w-3.5 h-3.5" />
-                                  Xóa
-                                </button>
+                                {!r.isSystem && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => openEdit(r)}
+                                      className="inline-flex items-center gap-1 px-2 py-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-sm mr-1"
+                                    >
+                                      <FaEdit className="w-3.5 h-3.5" />
+                                      Sửa
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setDeleteId(r.id)}
+                                      className="inline-flex items-center gap-1 px-2 py-1.5 text-red-600 hover:bg-red-50 rounded-lg text-sm"
+                                    >
+                                      <FaTrash className="w-3.5 h-3.5" />
+                                      Xóa
+                                    </button>
+                                  </>
+                                )}
+                                {r.isSystem && (
+                                  <span className="text-xs text-gray-400">Chỉ xem</span>
+                                )}
                               </td>
                             </tr>
                           );

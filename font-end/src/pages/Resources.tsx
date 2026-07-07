@@ -5,6 +5,7 @@ import PageHeading from '../components/heading';
 import { useI18n } from '../i18n/I18nProvider';
 import type { TranslationKey } from '../i18n/translations';
 import { ResourceService, Resource, ResourceFilters } from '../services/ResourceService';
+import { canDownloadResource } from '../helpers/resourceApproval';
 import { DownloadHistoryService } from '../services/DownloadHistoryService';
 import { FavoritesService } from '../services/FavoritesService';
 import { BookmarksService } from '../services/BookmarksService';
@@ -45,7 +46,7 @@ const STATUS_I18N: Record<string, TranslationKey> = {
 };
 
 const Resources: React.FC = () => {
-  const { isAdmin, hasPermission } = useAuth();
+  const { user, isAdmin, hasPermission } = useAuth();
   const canEditResource = isAdmin || hasPermission('manage_resources');
   const { t, locale } = useI18n();
   const navigate = useNavigate();
@@ -194,6 +195,10 @@ const Resources: React.FC = () => {
 
   // Handle download - ghi vào lịch sử đã tải để hiển thị tại /resources/downloaded
   const handleDownload = async (resource: Resource) => {
+    if (!canDownloadResource(resource, user?.id, isAdmin)) {
+      alert('Tài nguyên chưa được duyệt. Chỉ chủ sở hữu và admin mới có thể tải xuống.');
+      return;
+    }
     const filename =
       (resource.url && resource.url.split('/').pop()) ||
       (resource.name ? `${resource.name}.bin` : undefined);
@@ -266,6 +271,7 @@ const Resources: React.FC = () => {
         className={`px-2 py-1 rounded-full text-xs font-medium border ${
           statusColors[statusName] || 'bg-gray-100 text-gray-800 border-gray-200'
         }`}
+        title={statusName === 'Pending' ? t('resources.pending.notice') : undefined}
       >
         {getStatusLabel(statusName)}
       </span>
@@ -578,8 +584,17 @@ const Resources: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => handleDownload(resource)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              title={t('resources.action.download')}
+                              disabled={!canDownloadResource(resource, user?.id, isAdmin)}
+                              className={`p-2 rounded-lg transition-colors ${
+                                canDownloadResource(resource, user?.id, isAdmin)
+                                  ? 'text-blue-600 hover:bg-blue-50'
+                                  : 'text-gray-300 cursor-not-allowed'
+                              }`}
+                              title={
+                                canDownloadResource(resource, user?.id, isAdmin)
+                                  ? t('resources.action.download')
+                                  : 'Chờ duyệt — chưa thể tải'
+                              }
                             >
                               <FaDownload className="w-4 h-4" />
                             </button>
@@ -736,7 +751,12 @@ const Resources: React.FC = () => {
                     <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
                       <button
                         onClick={() => handleDownload(resource)}
-                        className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs font-medium flex items-center justify-center gap-1"
+                        disabled={!canDownloadResource(resource, user?.id, isAdmin)}
+                        className={`flex-1 px-3 py-2 rounded-lg transition-colors text-xs font-medium flex items-center justify-center gap-1 ${
+                          canDownloadResource(resource, user?.id, isAdmin)
+                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                        }`}
                       >
                         <FaDownload className="w-3 h-3" />
                         {t('resources.action.download')}

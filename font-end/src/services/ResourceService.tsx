@@ -1,4 +1,5 @@
 import { apiCall } from '../configs/axios';
+import { getApiErrorMessage } from '../helpers/axiosHelper';
 
 export interface Resource {
   id: string;
@@ -301,18 +302,22 @@ export const ResourceService = {
     resourceId: string,
     payload: { email: string; can_edit?: boolean }
   ): Promise<ResourceShareInfo> {
-    const response = await apiCall.post<{
-      code: string;
-      data?: ResourceShareInfo;
-      message?: string;
-    }>(`/resource-management/resources/${resourceId}/shares`, {
-      email: payload.email,
-      can_edit: payload.can_edit ?? false,
-    });
-    if (response.data?.code === 'BE0000' && response.data.data) {
-      return response.data.data;
+    try {
+      const response = await apiCall.post<{
+        code: string;
+        data?: ResourceShareInfo;
+        message?: string;
+      }>(`/resource-management/resources/${resourceId}/shares`, {
+        email: payload.email,
+        can_edit: payload.can_edit ?? false,
+      });
+      if (response.data?.code === 'BE0000' && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data?.message || 'Chia sẻ tài nguyên thất bại');
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, 'Chia sẻ tài nguyên thất bại. Vui lòng kiểm tra email người nhận.'));
     }
-    throw new Error(response.data?.message || 'Chia sẻ tài nguyên thất bại');
   },
 
   /**
@@ -344,18 +349,22 @@ export const ResourceService = {
    */
   async downloadResource(resourceId: string, filename?: string): Promise<void> {
     const url = `/resource-management/download/?resource_id=${resourceId}`;
-    const response = await apiCall.get<Blob>(url, {
-      responseType: 'blob',
-    });
-    const blob = new Blob([response.data]);
-    const dlName = filename || `resource_${resourceId}.bin`;
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = dlName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
+    try {
+      const response = await apiCall.get<Blob>(url, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data]);
+      const dlName = filename || `resource_${resourceId}.bin`;
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = dlName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, 'Không thể tải xuống tài nguyên.'));
+    }
   },
 
   /**

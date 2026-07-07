@@ -225,6 +225,8 @@ export type TranslationKey =
   | "resources.status.pending"
   | "resources.status.approved"
   | "resources.status.rejected"
+  | "resources.pending.notice"
+  | "resources.pending.noShareDownload"
   | "resources.action.download"
   | "resources.action.removeFavorite"
   | "resources.action.addFavorite"
@@ -588,6 +590,8 @@ const vi: Record<TranslationKey, string> = {
   "resources.status.pending": "Chờ duyệt",
   "resources.status.approved": "Đã duyệt",
   "resources.status.rejected": "Từ chối",
+  "resources.pending.notice": "Chờ duyệt — chưa thể chia sẻ cho người khác",
+  "resources.pending.noShareDownload": "Chờ duyệt — chưa thể chia sẻ/tải",
   "resources.action.download": "Tải xuống",
   "resources.action.removeFavorite": "Bỏ yêu thích",
   "resources.action.addFavorite": "Thêm vào yêu thích",
@@ -958,6 +962,8 @@ const en: Record<TranslationKey, string> = {
   "resources.status.pending": "Pending",
   "resources.status.approved": "Approved",
   "resources.status.rejected": "Rejected",
+  "resources.pending.notice": "Pending approval — cannot share with others yet",
+  "resources.pending.noShareDownload": "Pending approval — cannot share or download",
   "resources.action.download": "Download",
   "resources.action.removeFavorite": "Remove from favorites",
   "resources.action.addFavorite": "Add to favorites",

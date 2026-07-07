@@ -2,7 +2,17 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_, cast, Date, desc
 from datetime import date, datetime, timedelta
-from app.src.models import User, Resource, ResourceTag, ProductType, ResourceStatus, DownloadLog
+from app.src.models import (
+    User,
+    Resource,
+    ResourceTag,
+    ProductType,
+    ResourceStatus,
+    ResourcePlatform,
+    ResourceStage,
+    DownloadLog,
+    Permission,
+)
 
 
 class StatisticsService:
@@ -434,6 +444,211 @@ class StatisticsService:
 
         except Exception as e:
             print(f"❌ Download Statistics Error: {str(e)}")
+            raise e
+
+    def _resolve_period(self, period: str) -> tuple[datetime, datetime]:
+        end_date = datetime.now()
+        days_map = {"1d": 1, "7d": 7, "30d": 30, "90d": 90, "1y": 365}
+        start_date = end_date - timedelta(days=days_map.get(period, 7))
+        return start_date, end_date
+
+    def _build_daily_series(
+        self, start_date: datetime, end_date: datetime, rows: list, value_key: str
+    ) -> list[dict]:
+        counts_by_day = {row.day.isoformat(): row.cnt for row in rows}
+        series: list[dict] = []
+        cursor = start_date.date()
+        end = end_date.date()
+        while cursor <= end:
+            key = cursor.isoformat()
+            series.append({value_key: counts_by_day.get(key, 0), "date": key})
+            cursor += timedelta(days=1)
+        return series
+
+    def get_upload_statistics(self, db_session: Session, period: str = "7d") -> dict:
+        """Upload (resource creation) statistics for a period."""
+        try:
+            start_date, end_date = self._resolve_period(period)
+            day_col = cast(Resource.created_at, Date).label("day")
+            rows = (
+                db_session.query(day_col, func.count(Resource.id).label("cnt"))
+                .filter(
+                    Resource.is_deleted.is_(False),
+                    Resource.created_at >= start_date,
+                    Resource.created_at <= end_date,
+                )
+                .group_by(day_col)
+                .order_by(day_col)
+                .all()
+            )
+            time_series = self._build_daily_series(start_date, end_date, rows, "uploads")
+            counts = [p["uploads"] for p in time_series]
+            total_uploads = sum(counts)
+            return {
+                "period": period,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "total_uploads": total_uploads,
+                "average_uploads": round(total_uploads / len(counts), 2) if counts else 0.0,
+                "peak_uploads": max(counts) if counts else 0,
+                "time_series": time_series,
+            }
+        except Exception as e:
+            print(f"❌ Upload Statistics Error: {str(e)}")
+            raise e
+
+    def get_user_statistics(self, db_session: Session, period: str = "30d") -> dict:
+        """User registration and activity statistics."""
+        try:
+            start_date, end_date = self._resolve_period(period)
+            today = date.today()
+
+            total_users = db_session.query(User).filter(User.is_deleted.is_(False)).count()
+            new_users_today = db_session.query(User).filter(
+                User.is_deleted.is_(False),
+                cast(User.created_at, Date) == today,
+            ).count()
+            locked_users = db_session.query(User).filter(
+                User.is_deleted.is_(False),
+                User.is_locked.is_(True),
+            ).count()
+
+            admin_users = (
+                db_session.query(func.count(func.distinct(User.id)))
+                .join(User.permissions)
+                .filter(
+                    User.is_deleted.is_(False),
+                    Permission.name == "AllAccess",
+                    Permission.is_deleted.is_(False),
+                )
+                .scalar()
+            ) or 0
+
+            active_downloaders = (
+                db_session.query(func.count(func.distinct(DownloadLog.user_id)))
+                .filter(DownloadLog.downloaded_at >= start_date)
+                .scalar()
+            ) or 0
+
+            day_col = cast(User.created_at, Date).label("day")
+            reg_rows = (
+                db_session.query(day_col, func.count(User.id).label("cnt"))
+                .filter(
+                    User.is_deleted.is_(False),
+                    User.created_at >= start_date,
+                    User.created_at <= end_date,
+                )
+                .group_by(day_col)
+                .order_by(day_col)
+                .all()
+            )
+            registrations = self._build_daily_series(start_date, end_date, reg_rows, "registrations")
+
+            return {
+                "period": period,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "total_users": total_users,
+                "new_users_today": new_users_today,
+                "locked_users": locked_users,
+                "admin_users": admin_users,
+                "active_downloaders": active_downloaders,
+                "registrations": registrations,
+            }
+        except Exception as e:
+            print(f"❌ User Statistics Error: {str(e)}")
+            raise e
+
+    def _breakdown_with_percentage(self, rows: list[tuple[str, int]]) -> list[dict]:
+        total = sum(count for _, count in rows) or 1
+        palette = ["blue", "green", "yellow", "purple", "orange", "red", "cyan", "gray"]
+        result = []
+        for idx, (name, count) in enumerate(rows):
+            result.append({
+                "name": name or "Unknown",
+                "count": count,
+                "percentage": round((count / total) * 100, 1),
+                "color": palette[idx % len(palette)],
+            })
+        return result
+
+    def get_resource_status_breakdown(self, db_session: Session) -> list[dict]:
+        """Resources grouped by approval/status name."""
+        try:
+            rows = (
+                db_session.query(ResourceStatus.name, func.count(Resource.id))
+                .join(Resource, Resource.status_id == ResourceStatus.id)
+                .filter(Resource.is_deleted.is_(False), ResourceStatus.is_deleted.is_(False))
+                .group_by(ResourceStatus.name)
+                .order_by(desc(func.count(Resource.id)))
+                .all()
+            )
+            no_status = db_session.query(Resource).filter(
+                Resource.is_deleted.is_(False),
+                Resource.status_id.is_(None),
+            ).count()
+            items = self._breakdown_with_percentage([(n, c) for n, c in rows])
+            if no_status:
+                total = sum(i["count"] for i in items) + no_status
+                for item in items:
+                    item["percentage"] = round((item["count"] / total) * 100, 1)
+                items.append({
+                    "name": "No status",
+                    "count": no_status,
+                    "percentage": round((no_status / total) * 100, 1),
+                    "color": "gray",
+                })
+            return items
+        except Exception as e:
+            print(f"❌ Resource Status Breakdown Error: {str(e)}")
+            raise e
+
+    def get_platform_breakdown(self, db_session: Session) -> list[dict]:
+        """Resources grouped by platform."""
+        try:
+            rows = (
+                db_session.query(ResourcePlatform.name, func.count(Resource.id))
+                .join(Resource, Resource.platform_id == ResourcePlatform.id)
+                .filter(Resource.is_deleted.is_(False), ResourcePlatform.is_deleted.is_(False))
+                .group_by(ResourcePlatform.name)
+                .order_by(desc(func.count(Resource.id)))
+                .all()
+            )
+            return self._breakdown_with_percentage([(n, c) for n, c in rows])
+        except Exception as e:
+            print(f"❌ Platform Breakdown Error: {str(e)}")
+            raise e
+
+    def get_product_type_breakdown(self, db_session: Session) -> list[dict]:
+        """Resources grouped by product type."""
+        try:
+            rows = (
+                db_session.query(ProductType.name, func.count(Resource.id))
+                .join(Resource, Resource.product_type_id == ProductType.id)
+                .filter(Resource.is_deleted.is_(False), ProductType.is_deleted.is_(False))
+                .group_by(ProductType.name)
+                .order_by(desc(func.count(Resource.id)))
+                .all()
+            )
+            return self._breakdown_with_percentage([(n, c) for n, c in rows])
+        except Exception as e:
+            print(f"❌ Product Type Breakdown Error: {str(e)}")
+            raise e
+
+    def get_stage_breakdown(self, db_session: Session) -> list[dict]:
+        """Resources grouped by lifecycle stage."""
+        try:
+            rows = (
+                db_session.query(ResourceStage.name, func.count(Resource.id))
+                .join(Resource, Resource.stage_id == ResourceStage.id)
+                .filter(Resource.is_deleted.is_(False), ResourceStage.is_deleted.is_(False))
+                .group_by(ResourceStage.name)
+                .order_by(desc(func.count(Resource.id)))
+                .all()
+            )
+            return self._breakdown_with_percentage([(n, c) for n, c in rows])
+        except Exception as e:
+            print(f"❌ Stage Breakdown Error: {str(e)}")
             raise e
 
     def _format_time_ago(self, time_diff: timedelta) -> str:

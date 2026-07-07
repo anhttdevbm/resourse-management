@@ -20,6 +20,7 @@ from app.src.repositories.user import UserRepository
 from app.src.schemas.resource import ResourceCreate, ResourceInfoCreate, ResourceUpdate
 from app.src.schemas.resource import ResourceGet
 from app.src.schemas.resource_share import ResourceShareCreate, ResourceShareInfo
+from app.src.services.auto_classification_engine import apply_auto_classification
 from app.src.services.base_service import BaseService
 from app.src.services.user_service import UserService
 from app.src.utils.common import pydantic_to_dict
@@ -33,6 +34,7 @@ def _user_has_admin_access(db_session: Session, user: User) -> bool:
 
 
 MANAGE_RESOURCES_PERMISSION = "manage_resources"
+_PUBLIC_RESOURCE_STATUS_NAMES = frozenset({"Approved", "Active"})
 
 _FK_UUID_FIELDS = frozenset(
     {"stage_id", "status_id", "platform_id", "product_type_id", "repo_id"}
@@ -86,6 +88,79 @@ def _user_can_update_resource(db_session: Session, resource: models.Resource, us
     if str(resource.user_id) == str(user.id):
         return True
     return _user_has_manage_resources(db_session, user)
+
+
+def _is_resource_owner(resource: models.Resource, user: User) -> bool:
+    return str(resource.user_id) == str(user.id)
+
+
+def _user_bypasses_approval_gate(db_session: Session, resource: models.Resource, user: User) -> bool:
+    return _is_resource_owner(resource, user) or _user_has_admin_access(db_session, user)
+
+
+def _get_resource_status_name(db_session: Session, resource: models.Resource) -> Optional[str]:
+    status = getattr(resource, "resource_status", None)
+    if status is not None and getattr(status, "name", None):
+        return status.name
+    if not resource.status_id:
+        return None
+    row = (
+        db_session.query(models.ResourceStatus)
+        .filter(
+            models.ResourceStatus.id == resource.status_id,
+            models.ResourceStatus.is_deleted.is_(False),
+        )
+        .first()
+    )
+    return row.name if row else None
+
+
+def _is_public_resource_status(status_name: Optional[str]) -> bool:
+    return status_name in _PUBLIC_RESOURCE_STATUS_NAMES
+
+
+def _approved_status_ids(db_session: Session) -> List[uuid.UUID]:
+    rows = (
+        db_session.query(models.ResourceStatus.id)
+        .filter(
+            models.ResourceStatus.name.in_(tuple(_PUBLIC_RESOURCE_STATUS_NAMES)),
+            models.ResourceStatus.is_deleted.is_(False),
+        )
+        .all()
+    )
+    return [row[0] for row in rows]
+
+
+def _ensure_resource_visible(db_session: Session, resource: models.Resource, user: User) -> None:
+    """Owner/admin luôn xem được; user khác chỉ xem tài nguyên đã duyệt."""
+    if _user_bypasses_approval_gate(db_session, resource, user):
+        return
+    if _is_public_resource_status(_get_resource_status_name(db_session, resource)):
+        return
+    raise BEErrorCode.RESOURCE_NOT_APPROVED.value
+
+
+def _ensure_can_download(db_session: Session, resource: models.Resource, user: User) -> None:
+    """Chỉ owner/admin tải được Pending/Rejected; user được share chỉ tải Approved/Active."""
+    if _user_bypasses_approval_gate(db_session, resource, user):
+        return
+    share = (
+        db_session.query(models.ResourceShare)
+        .filter(
+            models.ResourceShare.resource_id == resource.id,
+            models.ResourceShare.shared_with_user_id == user.id,
+        )
+        .first()
+    )
+    if not share:
+        raise BEErrorCode.USER_NOT_PERMISSION.value
+    if not _is_public_resource_status(_get_resource_status_name(db_session, resource)):
+        raise BEErrorCode.RESOURCE_DOWNLOAD_NOT_APPROVED.value
+
+
+def _ensure_can_share(db_session: Session, resource: models.Resource) -> None:
+    if not _is_public_resource_status(_get_resource_status_name(db_session, resource)):
+        raise BEErrorCode.RESOURCE_SHARE_REQUIRES_APPROVAL.value
 
 
 class ResourceService:
@@ -205,6 +280,7 @@ class ResourceService:
             user_id = user.id
 
             resource_create_dict = resource_create.dict(exclude={'user_id', 'key'})
+            tag_id_from_upload = resource_create.tag_id
             if "tag_id" in resource_create_dict:
                 del resource_create_dict["tag_id"]
             resource_create_dict['user_id'] = user_id
@@ -217,21 +293,26 @@ class ResourceService:
             
             # Get database session
             db_session = self.base_service.engine_postgresql.get_session()
-            
-            # Check if name exists
-            existing_resource = db_session.query(Resource).filter(
-                Resource.name == resource_create_dict['name'],
-                Resource.is_deleted == False
+
+            original_name = resource_create_dict["name"]
+
+            # Tên đang dùng bởi tài nguyên active → thêm timestamp
+            existing_active = db_session.query(Resource).filter(
+                Resource.name == original_name,
+                Resource.is_deleted.is_(False),
             ).first()
-            
-            # Only add timestamp if name already exists
-            if existing_resource:
+            if existing_active:
                 import time
-                timestamp = int(time.time())
-                resource_create_dict['name'] = f"{resource_create_dict['name']}_{timestamp}"
-                
+                resource_create_dict["name"] = f"{original_name}_{int(time.time())}"
             else:
-                print(f"Name is unique: {resource_create_dict['name']}")  
+                print(f"Name is unique: {resource_create_dict['name']}")
+
+            # Tài nguyên đã soft-delete cùng tên → khôi phục thay vì INSERT mới
+            soft_deleted = db_session.query(Resource).filter(
+                Resource.name == resource_create_dict["name"],
+                Resource.is_deleted.is_(True),
+            ).first()
+
             print(f"Resource data: {resource_create_dict}")
 
             if not resource_create_dict.get("status_id"):
@@ -241,6 +322,16 @@ class ResourceService:
                 ).first()
                 if pending:
                     resource_create_dict["status_id"] = pending.id
+
+            pending_tag_id = apply_auto_classification(
+                db_session,
+                user.id,
+                resource_create_dict,
+                filename=file_upload.filename or "",
+                only_fill_empty=True,
+            )
+            if not pending_tag_id and tag_id_from_upload:
+                pending_tag_id = tag_id_from_upload
 
             # Lưu file vào local storage
             try:
@@ -260,7 +351,28 @@ class ResourceService:
             except Exception as s3_error:
                 print(f"S3 upload failed: {str(s3_error)}")
 
-            uploaded_file_metadata = self.base_service.engine_postgresql.create(models.Resource, resource_create_dict)
+            if soft_deleted:
+                for key, value in resource_create_dict.items():
+                    setattr(soft_deleted, key, value)
+                soft_deleted.is_deleted = False
+                soft_deleted.download_count = 0
+                db_session.commit()
+                db_session.refresh(soft_deleted)
+                uploaded_file_metadata = soft_deleted
+            else:
+                uploaded_file_metadata = self.base_service.engine_postgresql.create(
+                    models.Resource, resource_create_dict
+                )
+
+            if pending_tag_id:
+                try:
+                    self._sync_resource_tags(
+                        db_session,
+                        uploaded_file_metadata.id,
+                        uuid.UUID(str(pending_tag_id)),
+                    )
+                except Exception as tag_error:
+                    logging.warning("Auto-classification tag sync failed: %s", tag_error)
 
             return uploaded_file_metadata
 
@@ -278,14 +390,7 @@ class ResourceService:
         if not resource:
             raise BEErrorCode.RESOURCE_NOT_FOUND.value
 
-        # Admin hoặc chủ tài nguyên / được share
-        if resource.user_id != user.id and not _user_has_admin_access(db_session, user):
-            share = db_session.query(models.ResourceShare).filter(
-                models.ResourceShare.resource_id == resource.id,
-                models.ResourceShare.shared_with_user_id == user.id,
-            ).first()
-            if not share:
-                raise BEErrorCode.USER_NOT_PERMISSION.value
+        _ensure_can_download(db_session, resource, user)
 
         # Lấy đường dẫn đã lưu trong DB
         stored = self.base_service.engine_postgresql.get_single_data(models.Resource, resource_id)
@@ -361,13 +466,14 @@ class ResourceService:
         resource = self.file_repository.get(db_session, resource_id)
         if not resource:
             raise BEErrorCode.RESOURCE_NOT_FOUND.value
-        if resource.user_id != user.id:
+        if not _is_resource_owner(resource, user):
             share = db_session.query(models.ResourceShare).filter(
                 models.ResourceShare.resource_id == resource.id,
                 models.ResourceShare.shared_with_user_id == user.id,
             ).first()
             if not share:
                 raise BEErrorCode.USER_NOT_PERMISSION.value
+        _ensure_resource_visible(db_session, resource, user)
         return resource
 
     def search_resources(self, db_session: Session, filters: ResourceGet,
@@ -430,6 +536,12 @@ class ResourceService:
             shared_q = shared_q.filter(models.Resource.product_type_id == filters.product_type_id)
         if filters.repo_id:
             shared_q = shared_q.filter(models.Resource.repo_id == filters.repo_id)
+
+        approved_ids = _approved_status_ids(db_session)
+        if approved_ids:
+            shared_q = shared_q.filter(models.Resource.status_id.in_(approved_ids))
+        else:
+            shared_q = shared_q.filter(models.Resource.id.is_(None))
 
         resources = own_q.union(shared_q).all()
         sorted_resource = sorted(resources, key=lambda x: x.created_at)
@@ -540,14 +652,15 @@ class ResourceService:
         # Chỉ chủ tài nguyên mới được share
         if resource.user_id != owner.id:
             raise BEErrorCode.USER_NOT_PERMISSION.value
+        _ensure_can_share(db_session, resource)
 
         target_user = self.user_repository.get_user_by_email(db_session, payload.email)
         if not target_user:
-            raise BEErrorCode.USER_NOT_FOUND.value
+            raise BEErrorCode.SHARE_USER_NOT_FOUND.value
 
         # Không cho share cho chính mình (không cần thiết)
         if target_user.id == owner.id:
-            raise BEErrorCode.CONFIG_EXISTED.value  # dùng tạm cho trường hợp không hợp lệ
+            raise BEErrorCode.SHARE_SELF_NOT_ALLOWED.value
 
         share = db_session.query(models.ResourceShare).filter(
             models.ResourceShare.resource_id == resource.id,

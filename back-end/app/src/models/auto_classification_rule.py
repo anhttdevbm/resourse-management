@@ -13,7 +13,8 @@ class AutoClassificationRule(Base):
     """Điều kiện khớp tên/ext + gán metadata (stage, tag, …)."""
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=generate_uuid)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    is_system: Mapped[bool] = mapped_column(BOOLEAN, nullable=False, server_default="false")
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     enabled: Mapped[bool] = mapped_column(BOOLEAN, nullable=False, server_default="true")
     title: Mapped[str] = mapped_column(String(255), nullable=False)

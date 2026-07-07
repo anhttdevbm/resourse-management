@@ -121,3 +121,69 @@ def get_download_statistics(
     except Exception as e:
         print(f"❌ Download Statistics Controller Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@statistics_routers.get("/statistics/uploads", response_model=ResponseObject)
+def get_upload_statistics(
+    period: str = Query(default="7d", pattern="^(1d|7d|30d|90d|1y)$"),
+    db_session: Session = Depends(get_db_session),
+):
+    """Upload statistics for a specific period."""
+    try:
+        data = statistics_service.get_upload_statistics(db_session, period)
+        return ResponseObject(data=data, code="BE0000")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@statistics_routers.get("/statistics/users", response_model=ResponseObject)
+def get_user_statistics(
+    period: str = Query(default="30d", pattern="^(1d|7d|30d|90d|1y)$"),
+    db_session: Session = Depends(get_db_session),
+):
+    """User registration and activity statistics."""
+    try:
+        data = statistics_service.get_user_statistics(db_session, period)
+        return ResponseObject(data=data, code="BE0000")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@statistics_routers.get("/statistics/resource-status", response_model=ResponseObject)
+def get_resource_status_breakdown(db_session: Session = Depends(get_db_session)):
+    """Resources grouped by status."""
+    try:
+        data = statistics_service.get_resource_status_breakdown(db_session)
+        return ResponseObject(data=data, code="BE0000")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@statistics_routers.get("/statistics/platforms", response_model=ResponseObject)
+def get_platform_breakdown(db_session: Session = Depends(get_db_session)):
+    """Resources grouped by platform."""
+    try:
+        data = statistics_service.get_platform_breakdown(db_session)
+        return ResponseObject(data=data, code="BE0000")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@statistics_routers.get("/statistics/product-types", response_model=ResponseObject)
+def get_product_type_breakdown(db_session: Session = Depends(get_db_session)):
+    """Resources grouped by product type."""
+    try:
+        data = statistics_service.get_product_type_breakdown(db_session)
+        return ResponseObject(data=data, code="BE0000")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@statistics_routers.get("/statistics/stages", response_model=ResponseObject)
+def get_stage_breakdown(db_session: Session = Depends(get_db_session)):
+    """Resources grouped by stage."""
+    try:
+        data = statistics_service.get_stage_breakdown(db_session)
+        return ResponseObject(data=data, code="BE0000")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

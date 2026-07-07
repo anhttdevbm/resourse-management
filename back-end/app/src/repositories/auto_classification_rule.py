@@ -14,13 +14,33 @@ class AutoClassificationRuleRepository(BaseSQLRepository[models.AutoClassificati
     """CRUD + list theo user."""
 
     def get_all_by_user(self, session: Session, user_id: uuid.UUID) -> List[models.AutoClassificationRule]:
-        """Quy tắc chưa xóa của user, sort_order tăng dần."""
+        """Quy tắc riêng của user (không gồm quy tắc hệ thống), sort_order tăng dần."""
         try:
             return (
                 session.query(self.model)
-                .filter(self.model.user_id == user_id, self.model.is_deleted.is_(False))
+                .filter(
+                    self.model.user_id == user_id,
+                    self.model.is_deleted.is_(False),
+                    self.model.is_system.is_(False),
+                )
                 .order_by(self.model.sort_order.asc(), self.model.created_at.asc())
                 .all()
             )
         except SQLAlchemyError as ex:
             raise ServerErrorCode.DATABASE_ERROR.value(ex)
+
+    def get_system_rules(self, session: Session) -> List[models.AutoClassificationRule]:
+        """Quy tắc hệ thống áp dụng cho mọi user."""
+        try:
+            return (
+                session.query(self.model)
+                .filter(self.model.is_system.is_(True), self.model.is_deleted.is_(False))
+                .order_by(self.model.sort_order.asc(), self.model.created_at.asc())
+                .all()
+            )
+        except SQLAlchemyError as ex:
+            raise ServerErrorCode.DATABASE_ERROR.value(ex)
+
+    def get_effective_rules(self, session: Session, user_id: uuid.UUID) -> List[models.AutoClassificationRule]:
+        """Hệ thống trước, quy tắc user sau — rule đầu tiên khớp sẽ được dùng."""
+        return self.get_system_rules(session) + self.get_all_by_user(session, user_id)

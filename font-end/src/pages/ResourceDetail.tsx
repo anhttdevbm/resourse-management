@@ -2,6 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import PageHeading from '../components/heading';
 import { ResourceService, type Resource, type ResourceShareInfo } from '../services/ResourceService';
+import { getApiErrorMessage } from '../helpers/axiosHelper';
+import {
+  canDownloadResource,
+  canShareResource,
+  isPendingResourceStatus,
+} from '../helpers/resourceApproval';
 import { useAuth } from '../contexts/AuthContext';
 import { FaArrowLeft, FaDownload, FaFile, FaCalendarAlt, FaTag, FaBox, FaFolder, FaServer, FaImage, FaShareAlt, FaTrash, FaEdit } from 'react-icons/fa';
 
@@ -122,16 +128,24 @@ const ResourceDetail: React.FC = () => {
     }
   };
 
+  const isOwner = !!(user && resource && resource.user_id === user.id);
+  const canEdit = isOwner || isAdmin || hasPermission('manage_resources');
+  const statusName = resource?.resource_status?.name;
+  const isPending = isPendingResourceStatus(statusName);
+  const canDownload = resource ? canDownloadResource(resource, user?.id, isAdmin) : false;
+  const canShare = resource ? isOwner && canShareResource(resource) : false;
+
   const handleDownload = async () => {
-    if (!resource) return;
+    if (!resource || !canDownload) return;
     const filename =
       (resource.url && resource.url.split('/').pop()) ||
       (resource.name ? `${resource.name}.bin` : undefined);
-    await ResourceService.downloadResource(resource.id, filename);
+    try {
+      await ResourceService.downloadResource(resource.id, filename);
+    } catch (err: unknown) {
+      alert(getApiErrorMessage(err, 'Không thể tải xuống tài nguyên.'));
+    }
   };
-
-  const isOwner = !!(user && resource && resource.user_id === user.id);
-  const canEdit = isOwner || isAdmin || hasPermission('manage_resources');
 
   const handleShareSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,9 +161,9 @@ const ResourceDetail: React.FC = () => {
       // reload list
       const list = await ResourceService.getResourceShares(id);
       setShares(list);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Share failed:', err);
-      setShareError(err?.message || 'Chia sẻ thất bại. Vui lòng kiểm tra email.');
+      setShareError(getApiErrorMessage(err, 'Chia sẻ thất bại. Vui lòng kiểm tra email người nhận.'));
     } finally {
       setShareLoading(false);
     }
@@ -224,8 +238,14 @@ const ResourceDetail: React.FC = () => {
             )}
             {isOwner && (
               <button
-                onClick={() => setShareModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                onClick={() => canShare && setShareModalOpen(true)}
+                disabled={!canShare}
+                title={canShare ? 'Chia sẻ tài nguyên' : 'Chỉ chia sẻ được sau khi admin duyệt (Approved)'}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
+                  canShare
+                    ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
               >
                 <FaShareAlt className="w-4 h-4" />
                 Chia sẻ
@@ -233,13 +253,27 @@ const ResourceDetail: React.FC = () => {
             )}
             <button
               onClick={handleDownload}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              disabled={!canDownload}
+              title={canDownload ? 'Tải xuống' : 'Tài nguyên chưa được duyệt'}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
+                canDownload
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+              }`}
             >
               <FaDownload className="w-4 h-4" />
               Tải xuống
             </button>
           </div>
         </div>
+
+        {isPending && (
+          <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+            {isOwner || isAdmin
+              ? 'Chờ duyệt — chưa thể chia sẻ cho người khác. Chủ sở hữu và admin vẫn có thể tải xuống.'
+              : 'Chờ duyệt — chưa thể chia sẻ/tải'}
+          </div>
+        )}
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-6 border-b border-gray-200 bg-gray-50">
@@ -361,7 +395,7 @@ const ResourceDetail: React.FC = () => {
           </div>
         </div>
       </div>
-      {isOwner && shareModalOpen && (
+      {isOwner && shareModalOpen && canShare && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full mx-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">

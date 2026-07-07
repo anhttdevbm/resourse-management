@@ -10,6 +10,7 @@ export interface AutoClassificationRule {
   id: string;
   sortOrder: number;
   enabled: boolean;
+  isSystem?: boolean;
   title: string;
   matchField: AutoMatchField;
   matchOp: AutoMatchOp;
@@ -30,7 +31,8 @@ interface ApiEnvelope<T> {
 
 interface ApiRow {
   id: string;
-  user_id: string;
+  user_id?: string | null;
+  is_system?: boolean;
   sort_order: number;
   enabled: boolean;
   title: string;
@@ -55,6 +57,7 @@ function fromApiRow(r: ApiRow): AutoClassificationRule {
     id: String(r.id),
     sortOrder: Number(r.sort_order ?? 0),
     enabled: r.enabled !== false,
+    isSystem: r.is_system === true,
     title: String(r.title ?? ''),
     matchField: r.match_field === 'extension' ? 'extension' : 'name',
     matchOp: (OPS.includes(op as AutoMatchOp) ? op : 'contains') as AutoMatchOp,

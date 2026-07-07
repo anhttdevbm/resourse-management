@@ -29,6 +29,19 @@ docker compose up --build -d
 - **MinIO**: http://localhost:9000 (API) / http://localhost:9001 (Console)
 - **Adminer**: http://localhost:8085 (Database admin)
 
+### Bootstrap admin (tự động)
+
+Khi API container khởi động, chạy `scripts/bootstrap_admin.py` sau migration:
+
+| Biến `.env` | Mô tả |
+|-------------|--------|
+| `BOOTSTRAP_ADMIN_EMAIL` | Tạo user + `AllAccess` nếu chưa có |
+| `BOOTSTRAP_ADMIN_EMAILS` | Thêm admin (phân cách `,`) — gán `AllAccess` nếu user đã đăng ký/đăng nhập |
+
+Mặc định local: `admin@localhost.dev` và `anhttdevbm@gmail.com`.
+
+User OAuth (Google): đăng nhập lần đầu → restart API (`docker compose restart api`) để được gán admin.
+
 ### Default Credentials
 
 #### Database

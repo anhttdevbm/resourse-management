@@ -3,7 +3,8 @@
 Tạo (nếu chưa có) và gán quyền AllAccess cho admin bootstrap sau deploy.
 
 Biến trong product.env / .env:
-  BOOTSTRAP_ADMIN_EMAIL
+  BOOTSTRAP_ADMIN_EMAIL       — admin chính (tạo user nếu chưa có + AllAccess)
+  BOOTSTRAP_ADMIN_EMAILS      — thêm admin, phân cách bằng dấu phẩy (chỉ gán AllAccess nếu user đã tồn tại)
   BOOTSTRAP_ADMIN_PASSWORD
   BOOTSTRAP_ADMIN_NAME
 """
@@ -60,8 +61,11 @@ def ensure_all_access_permission(conn, email: str) -> None:
     if not user_row:
         password = _cfg("BOOTSTRAP_ADMIN_PASSWORD")
         if not password:
-            print("BOOTSTRAP_ADMIN_PASSWORD is required to create a new admin user.")
-            sys.exit(1)
+            print(
+                f"Skip {email}: user not found yet "
+                "(đăng nhập OAuth/lần đầu trước, hoặc set BOOTSTRAP_ADMIN_PASSWORD)."
+            )
+            return
         name = _cfg("BOOTSTRAP_ADMIN_NAME", "Admin")
         user_id = uuid.uuid4()
         conn.execute(
@@ -109,14 +113,29 @@ def ensure_all_access_permission(conn, email: str) -> None:
     print(f"Granted AllAccess to {email}")
 
 
+def _admin_emails() -> list[str]:
+    emails: list[str] = []
+    primary = _cfg("BOOTSTRAP_ADMIN_EMAIL")
+    if primary and "@" in primary:
+        emails.append(primary)
+    extra = _cfg("BOOTSTRAP_ADMIN_EMAILS")
+    if extra:
+        for part in extra.split(","):
+            email = part.strip()
+            if email and "@" in email and email not in emails:
+                emails.append(email)
+    return emails
+
+
 def main() -> None:
-    email = _cfg("BOOTSTRAP_ADMIN_EMAIL")
-    if not email or "@" not in email:
-        print("Skip bootstrap admin: BOOTSTRAP_ADMIN_EMAIL not set.")
+    emails = _admin_emails()
+    if not emails:
+        print("Skip bootstrap admin: BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_EMAILS not set.")
         return
 
     with engine.connect() as conn:
-        ensure_all_access_permission(conn, email)
+        for email in emails:
+            ensure_all_access_permission(conn, email)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
 import { cookieStorage } from "../utils/cookie";
+import { extractApiErrorMessage } from "../helpers/axiosHelper";
 
 const resolveBaseUrl = (): string => {
     const fromEnv = import.meta.env.VITE_API_URL;
@@ -250,6 +251,11 @@ apiCall.interceptors.response.use(
             } finally {
                 isRefreshing = false;
             }
+        }
+
+        const apiMessage = extractApiErrorMessage(error);
+        if (apiMessage) {
+            return Promise.reject(new Error(apiMessage));
         }
 
         return Promise.reject(error);

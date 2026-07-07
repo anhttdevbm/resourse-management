@@ -71,6 +71,36 @@ class BEErrorCode(Enum):
     RESOURCE_NAME_EXISTED = BusinessException(
         ExceptionDetail(message="Resource name already exists", code="BE0048")
     )
+    SHARE_USER_NOT_FOUND = BusinessException(
+        ExceptionDetail(
+            message="Không tìm thấy tài khoản với email này trong hệ thống. Người nhận cần đăng ký hoặc đăng nhập trước.",
+            code="BE0049",
+        )
+    )
+    SHARE_SELF_NOT_ALLOWED = BusinessException(
+        ExceptionDetail(
+            message="Bạn không thể chia sẻ tài nguyên cho chính mình.",
+            code="BE0050",
+        )
+    )
+    RESOURCE_NOT_APPROVED = BusinessException(
+        ExceptionDetail(
+            message="Tài nguyên chưa được duyệt hoặc không khả dụng. Chỉ chủ sở hữu và admin mới có thể truy cập.",
+            code="BE0051",
+        )
+    )
+    RESOURCE_SHARE_REQUIRES_APPROVAL = BusinessException(
+        ExceptionDetail(
+            message="Chỉ có thể chia sẻ tài nguyên đã được duyệt (Approved).",
+            code="BE0052",
+        )
+    )
+    RESOURCE_DOWNLOAD_NOT_APPROVED = BusinessException(
+        ExceptionDetail(
+            message="Tài nguyên chưa được duyệt. Chỉ chủ sở hữu và admin mới có thể tải xuống.",
+            code="BE0053",
+        )
+    )
 
 class ServerErrorCode(Enum):
     """doc."""
