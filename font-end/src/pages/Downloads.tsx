@@ -13,7 +13,8 @@ import {
   StatisticsService, 
   DownloadStatistics,
   TopDownloadedResource,
-  StatisticsData
+  StatisticsData,
+  type ReportPeriod,
 } from '../services/StatisticsService';
 import { useI18n } from '../i18n/I18nProvider';
 import type { TranslationKey } from '../i18n/translations';
@@ -26,7 +27,7 @@ const Downloads: React.FC = () => {
   const [overallStats, setOverallStats] = useState<StatisticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [topDownloadsLoading, setTopDownloadsLoading] = useState(true);
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('7d');
+  const [selectedPeriod, setSelectedPeriod] = useState<ReportPeriod>('7d');
 
   useEffect(() => {
     fetchData();
@@ -60,10 +61,21 @@ const Downloads: React.FC = () => {
     return num.toLocaleString(locale === 'en' ? 'en-US' : 'vi-VN');
   };
 
-  const getPeriodLabel = (period: string): string => {
+  const getPeriodLabel = (period: ReportPeriod): string => {
     const key = `downloads.period.${period}` as TranslationKey;
     const translated = t(key);
     return translated === key ? period : translated;
+  };
+
+  const formatChartLabel = (dateStr: string): string => {
+    try {
+      return new Date(dateStr).toLocaleDateString(locale === 'en' ? 'en-US' : 'vi-VN', {
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return dateStr;
+    }
   };
 
   // Calculate chart data for visualization
@@ -97,7 +109,7 @@ const Downloads: React.FC = () => {
             <span className="text-sm font-medium text-gray-700">{t('downloads.timeRange')}</span>
           </div>
           <div className="flex space-x-2">
-            {['1d', '7d', '30d', '90d', '1y'].map((period) => (
+            {(['1d', '7d', '30d', '90d', '1y'] as ReportPeriod[]).map((period) => (
               <button
                 key={period}
                 onClick={() => setSelectedPeriod(period)}
@@ -232,6 +244,7 @@ const Downloads: React.FC = () => {
                 <div className="flex items-end justify-between h-64 space-x-1">
                   {chartData.map((item, index) => {
                     const height = maxValue > 0 ? (item.downloads / maxValue) * 100 : 0;
+                    const chartLabel = formatChartLabel(item.date);
                     return (
                       <div key={index} className="flex-1 flex flex-col items-center group">
                         <div className="w-full flex flex-col items-center justify-end h-full">
@@ -239,12 +252,12 @@ const Downloads: React.FC = () => {
                             className="w-full bg-blue-500 rounded-t hover:bg-blue-600 transition-all duration-300 cursor-pointer group-hover:bg-blue-700"
                             style={{ height: `${Math.max(height, 2)}%` }}
                             title={t('downloads.chart.barTitle')
-                              .replace('{label}', item.label)
+                              .replace('{label}', chartLabel)
                               .replace('{count}', String(item.downloads))}
                           ></div>
                         </div>
                         <div className="mt-2 text-xs text-gray-500 text-center truncate w-full">
-                          {item.label}
+                          {chartLabel}
                         </div>
                       </div>
                     );
