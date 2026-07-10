@@ -33,6 +33,7 @@ services:
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
     volumes:
       - minio_data:/data
     ports:
@@ -65,6 +66,20 @@ services:
       - resource-management
     restart: "no"
 
+  redis:
+    image: redis:7-alpine
+    container_name: resource-management-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - resource-management
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   api:
     build:
       context: ../../
@@ -81,6 +96,8 @@ services:
         condition: service_started
       minio-init:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     env_file:
       - .env
     volumes:
@@ -95,9 +112,12 @@ services:
       USERNAME_DB: admin
       PASSWORD_DB: "123456"
       AWS_HOST: http://minio:9000
+      MINIO_PUBLIC_HOST: http://localhost:9000
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadmin
       AWS_BUCKET_NAME: resource-management
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000
       SEED_DEMO_DATA: "true"
     restart: unless-stopped

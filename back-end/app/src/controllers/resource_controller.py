@@ -1,11 +1,9 @@
 """Resource API endpoints."""
 import logging
-import os
 from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException, Query
 from sqlalchemy.orm import Session
-from starlette.responses import FileResponse
 
 from app.src import models
 from app.src.controllers.auth_controller import user_service
@@ -92,11 +90,21 @@ async def create_one(
     )
     try:
         result = await resource_service.upload_resource(file_upload, resource_create, user[0])
-
-        return ResponseObject(data=row2dict(result), code="BE0000", message="Upload successful")
+        data = row2dict(result)
+        job = getattr(result, "_classification_job", None)
+        if job:
+            data["classification_job"] = job
+        return ResponseObject(data=data, code="BE0000", message="Upload successful")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@resource_routers.get('/download/', response_model=ResponseObject)
+def download_one(resource_id: str, db_session: Session = Depends(get_db_session),
+                 user: Tuple[User, str] = Depends(user_service.get_current_user)):
+    """Trả URL MinIO tạm (presigned) để client tải trực tiếp."""
+    data = resource_service.download_resource(db_session, resource_id, user[0])
+    return ResponseObject(data=data, code="BE0000", message="Presigned URL generated")
 
 # =============================================================================
 # UC-RES-01: Cập nhật metadata tài nguyên
@@ -184,14 +192,6 @@ def back_up_resource(resource_id: str, db_session: Session = Depends(get_db_sess
     """Back up a resource."""
     resource_service.back_up(db_session, resource_id)
     return ResponseObject(message="Back Up Resource Success", code="BE0000")
-
-
-@resource_routers.get('/download/')
-def download_one(resource_id: str, db_session: Session = Depends(get_db_session),
-                 user: Tuple[User, str] = Depends(user_service.get_current_user)):
-    """Download resource."""
-    file_path = resource_service.download_resource(db_session, resource_id, user[0])
-    return FileResponse(file_path, media_type='application/octet-stream', filename=os.path.basename(file_path))
 
 
 @resource_routers.post("/resources/{resource_id}/shares", response_model=ResponseObject)

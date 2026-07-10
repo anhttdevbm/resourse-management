@@ -3,6 +3,7 @@ import io
 import logging
 from typing import Optional
 import boto3
+import decouple
 from botocore.client import Config
 from botocore.exceptions import NoCredentialsError
 
@@ -13,6 +14,9 @@ class S3Storage:
     def __init__(self, s3_host: str, s3_public_key: str, s3_secret_key: str, s3_bucket: str, s3_region: str):
         """Define init."""
         self.s3_bucket = s3_bucket
+        self._access_key = s3_public_key
+        self._secret_key = s3_secret_key
+        self._region = s3_region
         print(f"🔧 S3 Init - Host: {s3_host}, Bucket: {s3_bucket}, Key: {s3_public_key[:8]}...")
         
         session = boto3.Session(aws_access_key_id=s3_public_key, aws_secret_access_key=s3_secret_key)
@@ -91,17 +95,38 @@ class S3Storage:
         return bytes(file_content)
 
     def generate_presigned_url(self, object_name: str, expiration: int = 3600) -> str:
-        """Generate presigned URL for object access."""
+        """Generate presigned URL; ký bằng MINIO_PUBLIC_HOST nếu có (URL browser gọi MinIO)."""
         try:
-            url = self.client.generate_presigned_url(
-                'get_object',
-                Params={'Bucket': self.s3_bucket, 'Key': object_name},
-                ExpiresIn=expiration
+            public_host = decouple.config(
+                "MINIO_PUBLIC_HOST",
+                default=decouple.config("AWS_PUBLIC_HOST", default=None),
+            )
+            client = self.client
+            if public_host:
+                session = boto3.Session(
+                    aws_access_key_id=self._access_key,
+                    aws_secret_access_key=self._secret_key,
+                )
+                client = session.client(
+                    "s3",
+                    endpoint_url=public_host,
+                    region_name=self._region,
+                    config=Config(signature_version="s3v4"),
+                )
+            url = client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.s3_bucket, "Key": object_name},
+                ExpiresIn=expiration,
             )
             return url
         except Exception as e:
             logging.error(f"Error generating presigned URL: {str(e)}")
             raise
+
+    def head_object(self, object_name: str) -> bool:
+        """Kiểm tra object tồn tại trên bucket."""
+        self.client.head_object(Bucket=self.s3_bucket, Key=object_name)
+        return True
 
     def delete_object(self, object_name: str) -> bool:
         """Delete object from S3."""

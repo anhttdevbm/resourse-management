@@ -50,6 +50,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
     volumes:
       - minio_data:/data
     ports:
@@ -83,6 +84,20 @@ services:
       - rms-net
     restart: "no"
 
+  redis:
+    image: redis:7-alpine
+    container_name: rms-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_HOST_PORT:-1075}:6379"
+    networks:
+      - rms-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   api:
     build:
       context: ..
@@ -96,6 +111,9 @@ services:
       ENV_FILE: /app/.env
       HOST_DB: db
       AWS_HOST: http://minio:9000
+      MINIO_PUBLIC_HOST: ${MINIO_PUBLIC_HOST:-http://localhost:1073}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
     volumes:
       - ./product.env:/app/.env:ro
@@ -110,6 +128,8 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:30111/docs || exit 1"]
       interval: 15s

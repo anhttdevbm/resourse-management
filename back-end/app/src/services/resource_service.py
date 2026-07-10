@@ -1,7 +1,6 @@
 """Define Resource service."""
 import logging
 import os
-import tempfile
 import uuid
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -10,6 +9,7 @@ from fastapi.security import HTTPBearer
 from sqlalchemy import delete, insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
+import decouple
 
 from app.src import models
 from app.src.exceptions.error_code import BEErrorCode, ServerErrorCode
@@ -20,8 +20,8 @@ from app.src.repositories.user import UserRepository
 from app.src.schemas.resource import ResourceCreate, ResourceInfoCreate, ResourceUpdate
 from app.src.schemas.resource import ResourceGet
 from app.src.schemas.resource_share import ResourceShareCreate, ResourceShareInfo
-from app.src.services.auto_classification_engine import apply_auto_classification
 from app.src.services.base_service import BaseService
+from app.src.services.classification_queue import enqueue_classification_job
 from app.src.services.user_service import UserService
 from app.src.utils.common import pydantic_to_dict
 
@@ -315,6 +315,15 @@ class ResourceService:
 
             print(f"Resource data: {resource_create_dict}")
 
+            # Field trống lúc upload → worker classification được phép ghi đè placeholder
+            fill_keys = [
+                key
+                for key in ("stage_id", "product_type_id", "platform_id", "status_id", "repo_id")
+                if not resource_create_dict.get(key)
+            ]
+            if not tag_id_from_upload:
+                fill_keys.append("tag_id")
+
             if not resource_create_dict.get("status_id"):
                 pending = db_session.query(models.ResourceStatus).filter(
                     models.ResourceStatus.name == "Pending",
@@ -323,15 +332,7 @@ class ResourceService:
                 if pending:
                     resource_create_dict["status_id"] = pending.id
 
-            pending_tag_id = apply_auto_classification(
-                db_session,
-                user.id,
-                resource_create_dict,
-                filename=file_upload.filename or "",
-                only_fill_empty=True,
-            )
-            if not pending_tag_id and tag_id_from_upload:
-                pending_tag_id = tag_id_from_upload
+            self._ensure_required_metadata_defaults(db_session, resource_create_dict, user_id=user.id)
 
             # Lưu file vào local storage
             try:
@@ -364,70 +365,151 @@ class ResourceService:
                     models.Resource, resource_create_dict
                 )
 
-            if pending_tag_id:
+            if tag_id_from_upload:
                 try:
                     self._sync_resource_tags(
                         db_session,
                         uploaded_file_metadata.id,
-                        uuid.UUID(str(pending_tag_id)),
+                        uuid.UUID(str(tag_id_from_upload)),
                     )
+                    db_session.commit()
                 except Exception as tag_error:
-                    logging.warning("Auto-classification tag sync failed: %s", tag_error)
+                    logging.warning("Upload tag sync failed: %s", tag_error)
 
+            classification_job = None
+            try:
+                classification_job = enqueue_classification_job(
+                    resource_id=str(uploaded_file_metadata.id),
+                    user_id=str(user.id),
+                    filename=file_upload.filename or "",
+                    resource_name=str(uploaded_file_metadata.name or ""),
+                    fill_keys=fill_keys,
+                    tag_id_from_upload=str(tag_id_from_upload) if tag_id_from_upload else None,
+                )
+            except Exception as queue_error:
+                logging.error("Enqueue classification failed, applying sync fallback: %s", queue_error)
+                from app.src.services.auto_classification_engine import apply_auto_classification
+
+                sync_payload = {
+                    "name": uploaded_file_metadata.name,
+                    "stage_id": str(uploaded_file_metadata.stage_id) if "stage_id" not in fill_keys else None,
+                    "product_type_id": str(uploaded_file_metadata.product_type_id)
+                    if "product_type_id" not in fill_keys
+                    else None,
+                    "platform_id": str(uploaded_file_metadata.platform_id)
+                    if "platform_id" not in fill_keys
+                    else None,
+                    "status_id": str(uploaded_file_metadata.status_id) if "status_id" not in fill_keys else None,
+                    "repo_id": str(uploaded_file_metadata.repo_id) if "repo_id" not in fill_keys else None,
+                }
+                pending_tag = apply_auto_classification(
+                    db_session,
+                    user.id,
+                    sync_payload,
+                    filename=file_upload.filename or "",
+                    only_fill_empty=True,
+                )
+                for field in ("stage_id", "product_type_id", "platform_id", "status_id", "repo_id"):
+                    if field in fill_keys and sync_payload.get(field):
+                        setattr(uploaded_file_metadata, field, uuid.UUID(str(sync_payload[field])))
+                if pending_tag and "tag_id" in fill_keys:
+                    try:
+                        self._sync_resource_tags(
+                            db_session,
+                            uploaded_file_metadata.id,
+                            uuid.UUID(str(pending_tag)),
+                        )
+                    except Exception as tag_error:
+                        logging.warning("Sync fallback tag failed: %s", tag_error)
+                db_session.commit()
+                db_session.refresh(uploaded_file_metadata)
+
+            uploaded_file_metadata._classification_job = classification_job  # type: ignore[attr-defined]
             return uploaded_file_metadata
 
         except Exception as e:
             logging.error(f"Lỗi khi tải lên tài nguyên: {str(e)}")
             raise
 
+    def _ensure_required_metadata_defaults(
+        self, db_session: Session, payload: Dict, *, user_id: uuid.UUID
+    ) -> None:
+        """Đảm bảo FK bắt buộc có giá trị trước khi INSERT (placeholder cho queue)."""
+        catalog_defaults = (
+            ("stage_id", models.ResourceStage, "Development"),
+            ("platform_id", models.ResourcePlatform, "Web"),
+            ("product_type_id", models.ProductType, "Document"),
+        )
+        for field, model, preferred_name in catalog_defaults:
+            if payload.get(field):
+                continue
+            row = (
+                db_session.query(model)
+                .filter(model.name == preferred_name, model.is_deleted.is_(False))
+                .first()
+            )
+            if not row:
+                row = db_session.query(model).filter(model.is_deleted.is_(False)).first()
+            if not row:
+                raise BEErrorCode.RESOURCE_NOT_FOUND.value
+            payload[field] = row.id
 
-    def download_resource(self, db_session: Session, resource_id: str, user):
-        """Download resource for current user.
+        if not payload.get("repo_id"):
+            repo = (
+                db_session.query(models.PackageRepository)
+                .filter(
+                    models.PackageRepository.user_id == user_id,
+                    models.PackageRepository.is_deleted.is_(False),
+                )
+                .order_by(models.PackageRepository.created_at.asc())
+                .first()
+            )
+            if not repo:
+                repo = models.PackageRepository(user_id=user_id, name="Default")
+                db_session.add(repo)
+                db_session.flush()
+            payload["repo_id"] = repo.id
 
-        Ưu tiên đọc file từ local `uploads/...`. Nếu không có thì thử S3.
-        """
+    def download_resource(self, db_session: Session, resource_id: str, user) -> Dict:
+        """Sinh URL MinIO tạm (presigned) để client tải trực tiếp."""
         resource = self.file_repository.get(db_session, resource_id)
         if not resource:
             raise BEErrorCode.RESOURCE_NOT_FOUND.value
 
         _ensure_can_download(db_session, resource, user)
 
-        # Lấy đường dẫn đã lưu trong DB
         stored = self.base_service.engine_postgresql.get_single_data(models.Resource, resource_id)
-        file_url = stored.url  # ví dụ: "/uploads/images/1.0.0_file.png" hoặc "/images/..."
+        file_url = stored.url
+        s3_key = file_url.lstrip("/")
+        filename = os.path.basename(file_url) or f"resource_{resource_id}"
 
-        content: Optional[bytes] = None
+        expires_in = decouple.config(
+            "MINIO_PRESIGN_EXPIRES",
+            default=decouple.config("AWS_PRESIGN_EXPIRES", default=3600, cast=int),
+            cast=int,
+        )
 
-        # Thử đọc từ local nếu url trỏ vào thư mục uploads
-        if file_url.startswith("/uploads/"):
-            local_path = os.path.join(os.getcwd(), file_url.lstrip("/"))
-            try:
+        # Đảm bảo object có trên MinIO: nếu thiếu thì đẩy từ local
+        try:
+            self.base_service.engine_s3.head_object(s3_key)
+        except Exception:
+            local_path = os.path.join(os.getcwd(), file_url.lstrip("/")) if file_url.startswith("/uploads/") else None
+            content: Optional[bytes] = None
+            if local_path and os.path.isfile(local_path):
                 with open(local_path, "rb") as f:
                     content = f.read()
-                print(f"Read file from local uploads: {local_path}")
-            except Exception as fs_error:
-                print(f"Local read failed, fallback to S3: {str(fs_error)}")
+            if content is None:
+                raise BEErrorCode.RESOURCE_NOT_FOUND.value
+            self.base_service.engine_s3.put_object(s3_key, content)
 
-        # Nếu chưa có content, thử đọc từ S3
-        if content is None:
-            s3_key = file_url.lstrip("/")
-            try:
-                content = self.base_service.engine_s3.get_object(s3_key)
-                print(f"Read file from S3: {s3_key}")
-            except Exception as s3_error:
-                print(f"S3 get_object failed: {str(s3_error)}")
-                content = None
-
-        if not content:
-            raise BEErrorCode.RESOURCE_NOT_FOUND.value
-
+        url = self.base_service.engine_s3.generate_presigned_url(s3_key, expiration=expires_in)
         self._record_download(db_session, resource, user)
-
-        # Ghi ra file tạm để FileResponse trả về
-        file_path = os.path.join(tempfile.gettempdir(), os.path.basename(file_url))
-        with open(file_path, "wb") as file:
-            file.write(content)
-        return file_path
+        return {
+            "url": url,
+            "expires_in": expires_in,
+            "filename": filename,
+            "resource_id": str(resource.id),
+        }
 
     def _record_download(self, db_session: Session, resource: models.Resource, user: User) -> None:
         """Persist download log and increment resource download counter."""

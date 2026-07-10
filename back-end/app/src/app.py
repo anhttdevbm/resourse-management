@@ -27,10 +27,25 @@ from app.src.controllers.statistics_controller import statistics_routers
 from app.src.controllers.notification_controller import notification_router
 from app.src.controllers.auto_classification_rule_controller import auto_classification_routers
 from app.src.controllers.user_activity_controller import user_activity_router
+from app.src.controllers.processing_queue_controller import processing_queue_routers
 from app.src.exceptions.exception import BusinessException
 from app.src.exceptions.exception_handler import business_exception_handler
+from app.src.services.classification_queue import start_classification_worker
+from contextlib import asynccontextmanager
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    try:
+        start_classification_worker()
+    except Exception as exc:  # pragma: no cover
+        import logging
+
+        logging.error("Failed to start classification worker: %s", exc)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     SessionMiddleware,
     secret_key="truongtuananh1212004@123",  
@@ -95,3 +110,4 @@ app.include_router(statistics_routers, tags=["Statistics"], prefix=PREFIX)
 app.include_router(notification_router, tags=["Notification"], prefix=PREFIX)
 app.include_router(auto_classification_routers, tags=["Auto Classification"], prefix=PREFIX)
 app.include_router(user_activity_router, tags=["User Activity"], prefix=PREFIX)
+app.include_router(processing_queue_routers, tags=["Processing Queue"], prefix=PREFIX)

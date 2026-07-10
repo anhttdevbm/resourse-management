@@ -290,9 +290,29 @@ export const ResourceService = {
    * Get resource file as Blob (for preview, e.g. images). Does not trigger download.
    */
   async getResourceBlob(resourceId: string): Promise<Blob> {
-    const url = `/resource-management/download/?resource_id=${resourceId}`;
-    const response = await apiCall.get<Blob>(url, { responseType: 'blob' });
-    return new Blob([response.data]);
+    const presign = await ResourceService.getDownloadUrl(resourceId);
+    const response = await fetch(presign.url);
+    if (!response.ok) {
+      throw new Error('Không thể tải nội dung tài nguyên.');
+    }
+    return response.blob();
+  },
+
+  /**
+   * Lấy URL MinIO tạm (presigned) sau khi API kiểm tra quyền + ghi log.
+   */
+  async getDownloadUrl(
+    resourceId: string
+  ): Promise<{ url: string; expires_in: number; filename: string; resource_id: string }> {
+    const response = await apiCall.get<{
+      code: string;
+      data?: { url: string; expires_in: number; filename: string; resource_id: string };
+      message?: string;
+    }>(`/resource-management/download/?resource_id=${resourceId}`);
+    if (response.data?.code === 'BE0000' && response.data.data?.url) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Không tạo được link tải xuống.');
   },
 
   /**
@@ -345,23 +365,18 @@ export const ResourceService = {
   },
 
   /**
-   * Download a resource via authenticated request
+   * Download a resource via authenticated presigned MinIO URL
    */
   async downloadResource(resourceId: string, filename?: string): Promise<void> {
-    const url = `/resource-management/download/?resource_id=${resourceId}`;
     try {
-      const response = await apiCall.get<Blob>(url, {
-        responseType: 'blob',
-      });
-      const blob = new Blob([response.data]);
-      const dlName = filename || `resource_${resourceId}.bin`;
+      const data = await ResourceService.getDownloadUrl(resourceId);
       const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = dlName;
+      link.href = data.url;
+      link.download = filename || data.filename || `resource_${resourceId}.bin`;
+      link.rel = 'noopener';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
     } catch (error) {
       throw new Error(getApiErrorMessage(error, 'Không thể tải xuống tài nguyên.'));
     }
