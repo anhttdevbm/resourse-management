@@ -84,8 +84,14 @@ def update_auto_classification_rule(
     db_session: Session = Depends(get_db_session),
     user: Tuple[User, str] = Depends(user_service.get_current_user),
 ) -> ResponseObject:
-    """Cập nhật quy tắc."""
+    """Cập nhật quy tắc. Chỉ {enabled} cũng áp dụng được cho system rule (override per-user)."""
     rid = uuid.UUID(rule_id)
+    data = body.dict(exclude_unset=True)
+    if set(data.keys()) == {"enabled"}:
+        result = auto_classification_rule_service.set_enabled(
+            db_session, user[0].id, rid, bool(data["enabled"])
+        )
+        return ResponseObject(data=result, code="BE0000")
     row = auto_classification_rule_service.update(db_session, user[0].id, rid, body)
     return ResponseObject(data=auto_classification_rule_service.rule_to_dict(row), code="BE0000")
 

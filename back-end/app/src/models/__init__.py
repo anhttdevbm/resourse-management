@@ -14,6 +14,7 @@ from .resource_platform import ResourcePlatform
 from .notification import Notification
 from .resource_share import ResourceShare
 from .auto_classification_rule import AutoClassificationRule
+from .auto_classification_rule_override import AutoClassificationRuleOverride
 from .download_log import DownloadLog
 from .user_favorite import UserFavorite
 from .user_bookmark import UserBookmark

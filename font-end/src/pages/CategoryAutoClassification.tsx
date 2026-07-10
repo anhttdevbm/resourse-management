@@ -830,11 +830,17 @@ const CategoryAutoClassification: React.FC = () => {
                               <td className="px-3 py-3">
                                 <button
                                   type="button"
-                                  onClick={() => !r.isSystem && toggleEnabled(r)}
-                                  disabled={r.isSystem}
+                                  onClick={() => toggleEnabled(r)}
+                                  title={
+                                    r.isSystem
+                                      ? r.enabled
+                                        ? 'Tắt quy tắc hệ thống (chỉ với tài khoản của bạn)'
+                                        : 'Bật lại quy tắc hệ thống'
+                                      : undefined
+                                  }
                                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                                     r.enabled ? 'bg-blue-600' : 'bg-gray-300'
-                                  } ${r.isSystem ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  }`}
                                 >
                                   <span
                                     className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -853,7 +859,7 @@ const CategoryAutoClassification: React.FC = () => {
                                   )}
                                 </p>
                                 <p className="text-xs text-gray-500 mt-0.5">
-                                  {r.isSystem ? 'Tự áp dụng khi upload · ' : ''}
+                                  {r.isSystem ? 'Có thể tắt riêng cho bạn · ' : ''}
                                   {summarizeRule(r)}
                                 </p>
                               </td>
@@ -882,7 +888,7 @@ const CategoryAutoClassification: React.FC = () => {
                                   </>
                                 )}
                                 {r.isSystem && (
-                                  <span className="text-xs text-gray-400">Chỉ xem</span>
+                                  <span className="text-xs text-gray-400">Không sửa/xóa nội dung</span>
                                 )}
                               </td>
                             </tr>

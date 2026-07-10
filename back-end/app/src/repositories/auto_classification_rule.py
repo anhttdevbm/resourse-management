@@ -1,6 +1,6 @@
 """Repository cho auto_classification_rules."""
 import uuid
-from typing import List
+from typing import Dict, List
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -41,6 +41,28 @@ class AutoClassificationRuleRepository(BaseSQLRepository[models.AutoClassificati
         except SQLAlchemyError as ex:
             raise ServerErrorCode.DATABASE_ERROR.value(ex)
 
+    def get_user_overrides(self, session: Session, user_id: uuid.UUID) -> Dict[uuid.UUID, bool]:
+        """Map rule_id → enabled theo override của user."""
+        try:
+            rows = (
+                session.query(models.AutoClassificationRuleOverride)
+                .filter(models.AutoClassificationRuleOverride.user_id == user_id)
+                .all()
+            )
+            return {row.rule_id: bool(row.enabled) for row in rows}
+        except SQLAlchemyError as ex:
+            raise ServerErrorCode.DATABASE_ERROR.value(ex)
+
     def get_effective_rules(self, session: Session, user_id: uuid.UUID) -> List[models.AutoClassificationRule]:
-        """Hệ thống trước, quy tắc user sau — rule đầu tiên khớp sẽ được dùng."""
-        return self.get_system_rules(session) + self.get_all_by_user(session, user_id)
+        """Hệ thống trước (đã lọc theo override), quy tắc user sau — first-match."""
+        overrides = self.get_user_overrides(session, user_id)
+        system: List[models.AutoClassificationRule] = []
+        for rule in self.get_system_rules(session):
+            if rule.id in overrides:
+                if not overrides[rule.id]:
+                    continue
+            elif not rule.enabled:
+                continue
+            system.append(rule)
+        user_rules = [r for r in self.get_all_by_user(session, user_id) if r.enabled]
+        return system + user_rules

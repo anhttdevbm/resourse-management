@@ -37,13 +37,19 @@ class AutoClassificationRuleService:
     def __init__(self) -> None:
         self.repo = AutoClassificationRuleRepository(models.AutoClassificationRule)
 
-    def rule_to_dict(self, r: models.AutoClassificationRule) -> Dict[str, Any]:
+    def rule_to_dict(
+        self,
+        r: models.AutoClassificationRule,
+        *,
+        enabled_override: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        enabled = r.enabled if enabled_override is None else enabled_override
         return {
             "id": str(r.id),
             "user_id": str(r.user_id) if r.user_id else None,
             "is_system": bool(getattr(r, "is_system", False)),
             "sort_order": r.sort_order,
-            "enabled": r.enabled,
+            "enabled": enabled,
             "title": r.title,
             "match_field": r.match_field,
             "match_op": r.match_op,
@@ -135,8 +141,50 @@ class AutoClassificationRuleService:
                 raise BEErrorCode.PACKAGE_REPOSITORY_NOT_FOUND.value
 
     def list_for_user(self, session: Session, user_id: uuid.UUID) -> List[Dict[str, Any]]:
-        rows = self.repo.get_effective_rules(session, user_id)
-        return [self.rule_to_dict(r) for r in rows]
+        overrides = self.repo.get_user_overrides(session, user_id)
+        rows = self.repo.get_system_rules(session) + self.repo.get_all_by_user(session, user_id)
+        out: List[Dict[str, Any]] = []
+        for r in rows:
+            override = overrides.get(r.id) if getattr(r, "is_system", False) else None
+            out.append(self.rule_to_dict(r, enabled_override=override))
+        return out
+
+    def set_enabled(
+        self, session: Session, user_id: uuid.UUID, rule_id: uuid.UUID, enabled: bool
+    ) -> Dict[str, Any]:
+        """Bật/tắt rule: user rule sửa trực tiếp; system rule ghi override per-user."""
+        r = self.repo.get(session, rule_id)
+        if not r or r.is_deleted:
+            raise BEErrorCode.AUTO_CLASSIFICATION_RULE_NOT_FOUND.value
+
+        if getattr(r, "is_system", False):
+            row = (
+                session.query(models.AutoClassificationRuleOverride)
+                .filter(
+                    models.AutoClassificationRuleOverride.user_id == user_id,
+                    models.AutoClassificationRuleOverride.rule_id == rule_id,
+                )
+                .first()
+            )
+            if row:
+                row.enabled = enabled
+            else:
+                session.add(
+                    models.AutoClassificationRuleOverride(
+                        user_id=user_id,
+                        rule_id=rule_id,
+                        enabled=enabled,
+                    )
+                )
+            session.commit()
+            return self.rule_to_dict(r, enabled_override=enabled)
+
+        owned = self.get_owned(session, rule_id, user_id)
+        self.repo.update(session, obj_id=owned.id, obj_in={"enabled": enabled})
+        out = self.repo.get(session, rule_id)
+        if not out:
+            raise BEErrorCode.AUTO_CLASSIFICATION_RULE_NOT_FOUND.value
+        return self.rule_to_dict(out)
 
     def get_owned(self, session: Session, rule_id: uuid.UUID, user_id: uuid.UUID) -> models.AutoClassificationRule:
         r = self.repo.get(session, rule_id)
@@ -180,8 +228,15 @@ class AutoClassificationRuleService:
     def update(
         self, session: Session, user_id: uuid.UUID, rule_id: uuid.UUID, body: AutoClassificationRuleUpdate
     ) -> models.AutoClassificationRule:
-        _ = self.get_owned(session, rule_id, user_id)
         data = body.dict(exclude_unset=True)
+        if set(data.keys()) == {"enabled"}:
+            self.set_enabled(session, user_id, rule_id, bool(data["enabled"]))
+            out = self.repo.get(session, rule_id)
+            if not out:
+                raise BEErrorCode.AUTO_CLASSIFICATION_RULE_NOT_FOUND.value
+            return out
+
+        _ = self.get_owned(session, rule_id, user_id)
         fk_check: Dict[str, Optional[str]] = {}
         for k in _ASSIGN_KEYS:
             if k in data:
