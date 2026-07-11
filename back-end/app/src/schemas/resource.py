@@ -38,15 +38,16 @@ class ResourceUpdate(BaseModel):
 class ResourceGet(BaseModel):
     """Define resource get."""
 
-    id: Optional[str]     # noqa
-    stage_id: Optional[str]
-    status_id: Optional[str]
-    name: Optional[str]
-    version: Optional[str]
-    platform_id: Optional[str]
-    product_type_id: Optional[str]
-    repo_id: Optional[str]
-    tag_id: Optional[str]
+    id: Optional[str] = None
+    stage_id: Optional[str] = None
+    status_id: Optional[str] = None
+    name: Optional[str] = None
+    version: Optional[str] = None
+    platform_id: Optional[str] = None
+    product_type_id: Optional[str] = None
+    repo_id: Optional[str] = None
+    tag_id: Optional[str] = None
+    q: Optional[str] = None  # free-text: khớp name hoặc version
 
 
 class ResourceDB(ResourceCreate):

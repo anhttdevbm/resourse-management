@@ -6,9 +6,9 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from fastapi import UploadFile
 from fastapi.security import HTTPBearer
-from sqlalchemy import delete, insert
+from sqlalchemy import delete, exists, insert, or_
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Query, Session
 import decouple
 
 from app.src import models
@@ -558,6 +558,58 @@ class ResourceService:
         _ensure_resource_visible(db_session, resource, user)
         return resource
 
+    def _apply_resource_filters(self, query: Query, filters: ResourceGet) -> Query:
+        """Áp dụng mọi tiêu chí lọc (gồm tag M2M và free-text q)."""
+        rid = _as_uuid(filters.id) if filters.id else None
+        if rid:
+            query = query.filter(models.Resource.id == rid)
+
+        stage_id = _as_uuid(filters.stage_id) if filters.stage_id else None
+        if stage_id:
+            query = query.filter(models.Resource.stage_id == stage_id)
+
+        status_id = _as_uuid(filters.status_id) if filters.status_id else None
+        if status_id:
+            query = query.filter(models.Resource.status_id == status_id)
+
+        platform_id = _as_uuid(filters.platform_id) if filters.platform_id else None
+        if platform_id:
+            query = query.filter(models.Resource.platform_id == platform_id)
+
+        product_type_id = _as_uuid(filters.product_type_id) if filters.product_type_id else None
+        if product_type_id:
+            query = query.filter(models.Resource.product_type_id == product_type_id)
+
+        repo_id = _as_uuid(filters.repo_id) if filters.repo_id else None
+        if repo_id:
+            query = query.filter(models.Resource.repo_id == repo_id)
+
+        if filters.name:
+            query = query.filter(models.Resource.name.ilike(f"%{filters.name.strip()}%"))
+
+        if filters.version:
+            query = query.filter(models.Resource.version.ilike(f"%{filters.version.strip()}%"))
+
+        if filters.q and filters.q.strip():
+            needle = f"%{filters.q.strip()}%"
+            query = query.filter(
+                or_(
+                    models.Resource.name.ilike(needle),
+                    models.Resource.version.ilike(needle),
+                )
+            )
+
+        tag_id = _as_uuid(filters.tag_id) if filters.tag_id else None
+        if tag_id:
+            tag_exists = exists().where(
+                resource_resource_tag.c.resource_id == models.Resource.id,
+                resource_resource_tag.c.resource_tag_id == tag_id,
+                resource_resource_tag.c.is_deleted.is_(False),
+            )
+            query = query.filter(tag_exists)
+
+        return query
+
     def search_resources(self, db_session: Session, filters: ResourceGet,
                          user: User) -> List[models.Resource]:
         """Search resources cho trang 'Tài nguyên của tôi'.
@@ -566,31 +618,12 @@ class ResourceService:
         - Tài nguyên do user hiện tại sở hữu
         - Tài nguyên được người khác share cho user hiện tại
         """
-        from sqlalchemy import and_
-
         # Query tài nguyên do user sở hữu
         own_q = db_session.query(models.Resource).filter(
             models.Resource.is_deleted.is_(False),
             models.Resource.user_id == user.id,
         )
-
-        # Apply filters giống FileRepository.search_resources
-        if filters.id:
-            own_q = own_q.filter(models.Resource.id == filters.id)
-        if filters.stage_id:
-            own_q = own_q.filter(models.Resource.stage_id == filters.stage_id)
-        if filters.status_id:
-            own_q = own_q.filter(models.Resource.status_id == filters.status_id)
-        if filters.name:
-            own_q = own_q.filter(models.Resource.name.like(f"%{filters.name}%"))
-        if filters.version:
-            own_q = own_q.filter(models.Resource.version == filters.version)
-        if filters.platform_id:
-            own_q = own_q.filter(models.Resource.platform_id == filters.platform_id)
-        if filters.product_type_id:
-            own_q = own_q.filter(models.Resource.product_type_id == filters.product_type_id)
-        if filters.repo_id:
-            own_q = own_q.filter(models.Resource.repo_id == filters.repo_id)
+        own_q = self._apply_resource_filters(own_q, filters)
 
         # Query tài nguyên được share cho user
         shared_q = (
@@ -601,23 +634,7 @@ class ResourceService:
                 models.ResourceShare.shared_with_user_id == user.id,
             )
         )
-
-        if filters.id:
-            shared_q = shared_q.filter(models.Resource.id == filters.id)
-        if filters.stage_id:
-            shared_q = shared_q.filter(models.Resource.stage_id == filters.stage_id)
-        if filters.status_id:
-            shared_q = shared_q.filter(models.Resource.status_id == filters.status_id)
-        if filters.name:
-            shared_q = shared_q.filter(models.Resource.name.like(f"%{filters.name}%"))
-        if filters.version:
-            shared_q = shared_q.filter(models.Resource.version == filters.version)
-        if filters.platform_id:
-            shared_q = shared_q.filter(models.Resource.platform_id == filters.platform_id)
-        if filters.product_type_id:
-            shared_q = shared_q.filter(models.Resource.product_type_id == filters.product_type_id)
-        if filters.repo_id:
-            shared_q = shared_q.filter(models.Resource.repo_id == filters.repo_id)
+        shared_q = self._apply_resource_filters(shared_q, filters)
 
         approved_ids = _approved_status_ids(db_session)
         if approved_ids:
@@ -644,22 +661,7 @@ class ResourceService:
         query = db_session.query(models.Resource)
         if not include_deleted:
             query = query.filter(models.Resource.is_deleted.is_(False))
-        if filters.id:
-            query = query.filter(models.Resource.id == filters.id)
-        if filters.stage_id:
-            query = query.filter(models.Resource.stage_id == filters.stage_id)
-        if filters.status_id:
-            query = query.filter(models.Resource.status_id == filters.status_id)
-        if filters.name:
-            query = query.filter(models.Resource.name.like(f"%{filters.name}%"))
-        if filters.version:
-            query = query.filter(models.Resource.version == filters.version)
-        if filters.platform_id:
-            query = query.filter(models.Resource.platform_id == filters.platform_id)
-        if filters.product_type_id:
-            query = query.filter(models.Resource.product_type_id == filters.product_type_id)
-        if filters.repo_id:
-            query = query.filter(models.Resource.repo_id == filters.repo_id)
+        query = self._apply_resource_filters(query, filters)
 
         resources = query.all()
         return sorted(resources, key=lambda x: x.created_at, reverse=True)

@@ -148,6 +148,7 @@ def get_resources(
     product_type_id: Optional[str] = Query(None),
     repo_id: Optional[str] = Query(None),
     tag_id: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
     db_session: Session = Depends(get_db_session),
     user: Tuple[User, str] = Depends(user_service.get_current_user)
 ) -> ResponseObject:
@@ -162,7 +163,8 @@ def get_resources(
         platform_id=platform_id,
         product_type_id=product_type_id,
         repo_id=repo_id,
-        tag_id=tag_id
+        tag_id=tag_id,
+        q=q,
     )
     resources: List[models.Resource] = resource_service.search_resources(db_session, filters, user[0])
 
@@ -242,6 +244,7 @@ def admin_list_resources(
     product_type_id: Optional[str] = Query(None),
     repo_id: Optional[str] = Query(None),
     tag_id: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
     include_deleted: bool = Query(False),
     db_session: Session = Depends(get_db_session),
     user: Tuple[User, str] = Depends(user_service.get_current_user),
@@ -257,6 +260,7 @@ def admin_list_resources(
         product_type_id=product_type_id,
         repo_id=repo_id,
         tag_id=tag_id,
+        q=q,
     )
     resources = resource_service.search_all_resources(
         db_session, filters, user[0], include_deleted=include_deleted

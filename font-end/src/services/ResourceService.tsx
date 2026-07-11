@@ -51,6 +51,8 @@ export interface ResourceFilters {
   product_type_id?: string;
   repo_id?: string;
   tag_id?: string;
+  /** Free-text: khớp tên hoặc phiên bản */
+  q?: string;
 }
 
 export interface ResourceResponse {
@@ -143,6 +145,7 @@ export const ResourceService = {
         if (filters.product_type_id) params.product_type_id = filters.product_type_id;
         if (filters.repo_id) params.repo_id = filters.repo_id;
         if (filters.tag_id) params.tag_id = filters.tag_id;
+        if (filters.q) params.q = filters.q;
       }
       
       const response = await apiCall.get<ResourceResponse>('/resource-management/resources/', {
