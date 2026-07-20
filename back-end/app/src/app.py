@@ -48,7 +48,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     SessionMiddleware,
-    secret_key="truongtuananh1212004@123",  
+    secret_key=decouple.config("SESSION_SECRET_KEY", default=decouple.config("SECRET_KEY")),
 )
 ALLOWED_ORIGINS = [
     o.strip()

@@ -1,6 +1,6 @@
 import type { Resource } from '../services/ResourceService';
 
-export const PUBLIC_RESOURCE_STATUSES = new Set(['Approved', 'Active']);
+export const PUBLIC_RESOURCE_STATUSES = new Set(['Approved']);
 
 export function isApprovedResourceStatus(statusName?: string | null): boolean {
   return !!statusName && PUBLIC_RESOURCE_STATUSES.has(statusName);

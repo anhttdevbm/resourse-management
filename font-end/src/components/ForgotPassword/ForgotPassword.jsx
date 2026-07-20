@@ -32,12 +32,13 @@ function ForgotPassword() {
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // Handle social login callbacks
+    // Handle social login callbacks (tokens may be in hash fragment)
     useEffect(() => {
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
         const urlParams = new URLSearchParams(window.location.search);
-        const accessToken = urlParams.get('access_token');
-        const refreshToken = urlParams.get('refresh_token');
-        const loginType = urlParams.get('login_type');
+        const accessToken = hashParams.get('access_token') || urlParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token') || urlParams.get('refresh_token');
+        const loginType = hashParams.get('login_type') || urlParams.get('login_type');
         const code = urlParams.get('code');
         const codeVerifier = urlParams.get('code_verifier');
 

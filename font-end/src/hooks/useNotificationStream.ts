@@ -8,8 +8,7 @@ import {
     setStreamingStatus,
 } from "../redux/slice/notificationSlice";
 import { getApiOrigin } from "../configs/axios";
-import { fetchNotifications } from "../services/notificationService";
-import { cookieStorage } from "../utils/cookie";
+import { fetchNotifications, createNotificationStreamTicket } from "../services/notificationService";
 
 export const useNotificationStream = () => {
     const dispatch = useDispatch();
@@ -25,44 +24,49 @@ export const useNotificationStream = () => {
             }
         };
 
-        const connectStream = () => {
-            const token = cookieStorage.getItem("accessToken");
-            if (!token) {
-                return;
-            }
-            const streamUrl = `${getApiOrigin()}/resource-management/notifications/stream?token=${encodeURIComponent(token)}`;
-            const eventSource = new EventSource(streamUrl);
-            eventSourceRef.current = eventSource;
-
-            eventSource.onopen = () => {
-                dispatch(setStreamingStatus(true));
-            };
-
-            eventSource.onmessage = (event) => {
-                try {
-                    const payload = JSON.parse(event.data);
-                    dispatch(addNotification(payload));
-                    toast.info(payload.title ?? "Bạn có thông báo mới");
-                } catch (error) {
-                    console.error("Notification parse error:", error);
+        const connectStream = async () => {
+            try {
+                const ticket = await createNotificationStreamTicket();
+                if (!ticket) {
+                    return;
                 }
-            };
+                const streamUrl = `${getApiOrigin()}/resource-management/notifications/stream?ticket=${encodeURIComponent(ticket)}`;
+                const eventSource = new EventSource(streamUrl);
+                eventSourceRef.current = eventSource;
 
-            eventSource.onerror = () => {
+                eventSource.onopen = () => {
+                    dispatch(setStreamingStatus(true));
+                };
+
+                eventSource.onmessage = (event) => {
+                    try {
+                        const payload = JSON.parse(event.data);
+                        dispatch(addNotification(payload));
+                        toast.info(payload.title ?? "Bạn có thông báo mới");
+                    } catch (error) {
+                        console.error("Notification parse error:", error);
+                    }
+                };
+
+                eventSource.onerror = () => {
+                    dispatch(setStreamingStatus(false));
+                    eventSource.close();
+                    if (!reconnectTimer.current) {
+                        reconnectTimer.current = window.setTimeout(() => {
+                            reconnectTimer.current = undefined;
+                            void connectStream();
+                        }, 5000);
+                    }
+                };
+            } catch (error) {
+                console.error("Notification stream connect failed:", error);
                 dispatch(setStreamingStatus(false));
-                eventSource.close();
-                if (!reconnectTimer.current) {
-                    reconnectTimer.current = window.setTimeout(() => {
-                        reconnectTimer.current = undefined;
-                        connectStream();
-                    }, 5000);
-                }
-            };
+            }
         };
 
         if (isAuthenticated) {
             loadInitial();
-            connectStream();
+            void connectStream();
         } else {
             dispatch(setStreamingStatus(false));
             eventSourceRef.current?.close();
@@ -77,4 +81,3 @@ export const useNotificationStream = () => {
         };
     }, [dispatch, isAuthenticated]);
 };
-

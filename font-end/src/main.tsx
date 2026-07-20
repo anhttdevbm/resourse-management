@@ -7,6 +7,7 @@ import User from './pages/user/user/View.tsx'
 import Layout from './components/layout'
 import {
   createBrowserRouter,
+  Navigate,
   RouterProvider,
 } from "react-router-dom"
 import {
@@ -169,11 +170,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/resources/add',
-        element: (
-          <ProtectedRoute requiredPermission="manage_resources">
-            <div>Thêm tài nguyên mới</div>
-          </ProtectedRoute>
-        )
+        element: <Navigate to="/resources/upload" replace />
       },
       {
         path: '/resources/categories',

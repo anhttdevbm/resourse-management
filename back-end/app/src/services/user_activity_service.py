@@ -17,6 +17,56 @@ from app.src.schemas.user_activity import (
     FavoriteCreate,
     SearchHistoryCreate,
 )
+from app.src.services.user_service import UserService
+
+_user_service = UserService()
+
+
+def _ensure_can_access_resource(
+    db_session: Session, resource_id: uuid.UUID, user_id: uuid.UUID
+) -> models.Resource:
+    """Prevent IDOR: only allow favorite/bookmark of visible resources."""
+    resource = (
+        db_session.query(models.Resource)
+        .filter(
+            models.Resource.id == resource_id,
+            models.Resource.is_deleted.is_(False),
+        )
+        .first()
+    )
+    if not resource:
+        raise BEErrorCode.RESOURCE_NOT_FOUND.value
+
+    if str(resource.user_id) == str(user_id):
+        return resource
+
+    user = db_session.query(models.User).filter(models.User.id == user_id).first()
+    if user and _user_service._has_admin_access(db_session, user):
+        return resource
+
+    status_name = None
+    if resource.status_id:
+        status = (
+            db_session.query(models.ResourceStatus)
+            .filter(models.ResourceStatus.id == resource.status_id)
+            .first()
+        )
+        status_name = status.name if status else None
+    if status_name == "Approved":
+        return resource
+
+    share = (
+        db_session.query(models.ResourceShare)
+        .filter(
+            models.ResourceShare.resource_id == resource.id,
+            models.ResourceShare.shared_with_user_id == user_id,
+        )
+        .first()
+    )
+    if share:
+        return resource
+
+    raise BEErrorCode.USER_NOT_PERMISSION.value
 
 
 def _normalize_query(query: str) -> str:
@@ -76,6 +126,7 @@ class UserActivityService:
         self, db_session: Session, user_id: uuid.UUID, payload: FavoriteCreate
     ) -> Dict[str, Any]:
         resource_id = uuid.UUID(payload.resource_id)
+        resource = _ensure_can_access_resource(db_session, resource_id, user_id)
         existing = (
             db_session.query(models.UserFavorite)
             .filter(
@@ -85,7 +136,6 @@ class UserActivityService:
             .first()
         )
         if existing:
-            resource = db_session.query(models.Resource).filter(models.Resource.id == resource_id).first()
             snap = _resource_snapshot(
                 resource,
                 resource_id=resource_id,
@@ -99,7 +149,6 @@ class UserActivityService:
         db_session.add(fav)
         db_session.commit()
         db_session.refresh(fav)
-        resource = db_session.query(models.Resource).filter(models.Resource.id == resource_id).first()
         snap = _resource_snapshot(
             resource,
             resource_id=resource_id,
@@ -155,6 +204,7 @@ class UserActivityService:
         self, db_session: Session, user_id: uuid.UUID, payload: BookmarkCreate
     ) -> Dict[str, Any]:
         resource_id = uuid.UUID(payload.resource_id)
+        resource = _ensure_can_access_resource(db_session, resource_id, user_id)
         existing = (
             db_session.query(models.UserBookmark)
             .filter(
@@ -167,7 +217,6 @@ class UserActivityService:
             if payload.note is not None:
                 existing.note = payload.note.strip() or None
                 db_session.commit()
-            resource = db_session.query(models.Resource).filter(models.Resource.id == resource_id).first()
             snap = _resource_snapshot(
                 resource,
                 resource_id=resource_id,
@@ -189,7 +238,6 @@ class UserActivityService:
         db_session.add(bookmark)
         db_session.commit()
         db_session.refresh(bookmark)
-        resource = db_session.query(models.Resource).filter(models.Resource.id == resource_id).first()
         snap = _resource_snapshot(
             resource,
             resource_id=resource_id,

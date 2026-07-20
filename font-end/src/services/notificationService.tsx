@@ -61,3 +61,13 @@ export const createNotification = async (payload: NotificationCreatePayload): Pr
     }
 };
 
+export const createNotificationStreamTicket = async (): Promise<string | null> => {
+    try {
+        const response = await axiosInstance.post(`${BASE_URL}/stream-ticket`);
+        return (response.data?.data?.ticket as string) ?? null;
+    } catch (error) {
+        handleAxiosError(error);
+        return null;
+    }
+};
+

@@ -188,11 +188,20 @@ def delete_resource(resource_id: str, db_session: Session = Depends(get_db_sessi
     return ResponseObject(message="Delete Resource Success", code="BE0000")
 
 
-@resource_routers.delete('/resoures/{resource_id}')
+@resource_routers.delete('/resources/{resource_id}/restore')
 def back_up_resource(resource_id: str, db_session: Session = Depends(get_db_session),
-                     _: Tuple[User, str] = Depends(user_service.get_current_user)) -> ResponseObject:
-    """Back up a resource."""
-    resource_service.back_up(db_session, resource_id)
+                     user: Tuple[User, str] = Depends(user_service.get_current_user)) -> ResponseObject:
+    """Restore a soft-deleted resource (owner or admin)."""
+    resource_service.back_up(db_session, resource_id, user[0])
+    return ResponseObject(message="Back Up Resource Success", code="BE0000")
+
+
+# Backward-compatible alias for the old typo route
+@resource_routers.delete('/resoures/{resource_id}')
+def back_up_resource_legacy(resource_id: str, db_session: Session = Depends(get_db_session),
+                            user: Tuple[User, str] = Depends(user_service.get_current_user)) -> ResponseObject:
+    """Legacy typo path — same as restore."""
+    resource_service.back_up(db_session, resource_id, user[0])
     return ResponseObject(message="Back Up Resource Success", code="BE0000")
 
 

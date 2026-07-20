@@ -50,43 +50,50 @@ const Login = () => {
         formState: { errors },
     } = useForm<Inputs>();
 
-    // Handle Facebook callback
+    // Handle OAuth callback — tokens arrive in URL hash (not query) to avoid log leakage
     useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const accessToken = urlParams.get('access_token');
-        const refreshToken = urlParams.get('refresh_token');
-        const loginType = urlParams.get('login_type');
-        const code = urlParams.get('code');
-        const codeVerifier = urlParams.get('code_verifier');
-        const fromPage = urlParams.get('from');
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        const queryParams = new URLSearchParams(window.location.search);
+        const accessToken = hashParams.get("access_token") || queryParams.get("access_token");
+        const refreshToken = hashParams.get("refresh_token") || queryParams.get("refresh_token");
+        const loginType = hashParams.get("login_type") || queryParams.get("login_type");
+        const code = queryParams.get("code");
+        const codeVerifier = queryParams.get("code_verifier");
+        const fromPage = queryParams.get("from");
+
+        const clearOAuthParamsFromUrl = () => {
+            if (window.location.hash || queryParams.has("access_token")) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        };
 
         if (accessToken && loginType === 'facebook') {
-            // Handle Facebook OAuth callback
-            cookieStorage.setItem("accessToken", accessToken, { expires: 7 });
+            cookieStorage.setItem("accessToken", accessToken);
             if (refreshToken) {
-                cookieStorage.setItem("refreshToken", refreshToken, { expires: 30 });
+                cookieStorage.setItem("refreshToken", refreshToken);
             }
+            clearOAuthParamsFromUrl();
             handleFacebookSuccess();
         } else if (accessToken && loginType === 'twitter') {
-            // Handle Twitter OAuth callback
-            cookieStorage.setItem("accessToken", accessToken, { expires: 7 });
+            cookieStorage.setItem("accessToken", accessToken);
             if (refreshToken) {
-                cookieStorage.setItem("refreshToken", refreshToken, { expires: 30 });
+                cookieStorage.setItem("refreshToken", refreshToken);
             }
+            clearOAuthParamsFromUrl();
             handleTwitterSuccess();
         } else if (accessToken && loginType === 'google') {
-            // Handle Google OAuth callback
-            cookieStorage.setItem("accessToken", accessToken, { expires: 7 });
+            cookieStorage.setItem("accessToken", accessToken);
             if (refreshToken) {
-                cookieStorage.setItem("refreshToken", refreshToken, { expires: 30 });
+                cookieStorage.setItem("refreshToken", refreshToken);
             }
+            clearOAuthParamsFromUrl();
             handleGoogleSuccess();
         } else if (accessToken && loginType === 'github') {
-            // Handle GitHub OAuth callback
-            cookieStorage.setItem("accessToken", accessToken, { expires: 7 });
+            cookieStorage.setItem("accessToken", accessToken);
             if (refreshToken) {
-                cookieStorage.setItem("refreshToken", refreshToken, { expires: 30 });
+                cookieStorage.setItem("refreshToken", refreshToken);
             }
+            clearOAuthParamsFromUrl();
             handleGithubSuccess();
         } else if (code && !loginType) {
             // Handle Twitter callback without login_type (fallback)
@@ -94,8 +101,8 @@ const Login = () => {
         }
         
         // Handle social login errors
-        const error = urlParams.get('error');
-        const errorMessage = urlParams.get('message');
+        const error = queryParams.get('error');
+        const errorMessage = queryParams.get('message');
         if (error === 'twitter_login_failed') {
             dispatch(setToast({ message: `Đăng nhập Twitter thất bại: ${errorMessage}`, type: "error" }));
         } else if (error === 'account_locked') {

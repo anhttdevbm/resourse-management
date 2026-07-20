@@ -35,9 +35,12 @@ const clearLocalAuth = (): void => {
 
 export const logout = async (): Promise<void> => {
     const accessToken = cookieStorage.getItem("accessToken");
+    const refreshToken = cookieStorage.getItem("refreshToken");
     try {
         if (accessToken) {
-            await axiosInstance.post("/api/auth/user/logout");
+            await axiosInstance.post("/api/auth/user/logout", {
+                refresh_token: refreshToken || undefined,
+            });
         }
     } catch (error) {
         console.warn("Backend logout failed (local session will still be cleared):", error);

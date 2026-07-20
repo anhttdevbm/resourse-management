@@ -34,7 +34,7 @@ def _user_has_admin_access(db_session: Session, user: User) -> bool:
 
 
 MANAGE_RESOURCES_PERMISSION = "manage_resources"
-_PUBLIC_RESOURCE_STATUS_NAMES = frozenset({"Approved", "Active"})
+_PUBLIC_RESOURCE_STATUS_NAMES = frozenset({"Approved"})
 
 _FK_UUID_FIELDS = frozenset(
     {"stage_id", "status_id", "platform_id", "product_type_id", "repo_id"}
@@ -84,10 +84,36 @@ def _user_has_manage_resources(db_session: Session, user: User) -> bool:
     return any(p.name == MANAGE_RESOURCES_PERMISSION for p in u.permissions)
 
 
+def _sanitize_upload_filename(filename: Optional[str]) -> str:
+    """Strip path components and dangerous characters from upload filenames."""
+    raw = (filename or "upload.bin").replace("\\", "/")
+    base = os.path.basename(raw).strip()
+    if not base or base in {".", ".."}:
+        base = "upload.bin"
+    # Remove null bytes and collapse remaining path separators
+    base = base.replace("\x00", "").replace("/", "_")
+    return base[:200]
+
+
+def _user_has_share_edit(db_session: Session, resource: models.Resource, user: User) -> bool:
+    share = (
+        db_session.query(models.ResourceShare)
+        .filter(
+            models.ResourceShare.resource_id == resource.id,
+            models.ResourceShare.shared_with_user_id == user.id,
+            models.ResourceShare.can_edit.is_(True),
+        )
+        .first()
+    )
+    return share is not None
+
+
 def _user_can_update_resource(db_session: Session, resource: models.Resource, user: User) -> bool:
     if str(resource.user_id) == str(user.id):
         return True
-    return _user_has_manage_resources(db_session, user)
+    if _user_has_manage_resources(db_session, user):
+        return True
+    return _user_has_share_edit(db_session, resource, user)
 
 
 def _is_resource_owner(resource: models.Resource, user: User) -> bool:
@@ -141,7 +167,7 @@ def _ensure_resource_visible(db_session: Session, resource: models.Resource, use
 
 
 def _ensure_can_download(db_session: Session, resource: models.Resource, user: User) -> None:
-    """Chỉ owner/admin tải được Pending/Rejected; user được share chỉ tải Approved/Active."""
+    """Chỉ owner/admin tải được Pending/Rejected; user được share chỉ tải Approved."""
     if _user_bypasses_approval_gate(db_session, resource, user):
         return
     share = (
@@ -254,13 +280,16 @@ class ResourceService:
 
     async def upload_resource(self, file_upload: UploadFile, resource_create: ResourceCreate, user):
         """Define upload resource service (Removed Role Check)."""
+        db_session = None
         try:
             content = await file_upload.read()
-            
-            # Get file extension to determine folder
-            file_extension = file_upload.filename.split('.')[-1].lower() if '.' in file_upload.filename else 'unknown'
+            safe_filename = _sanitize_upload_filename(file_upload.filename)
 
-            
+            # Get file extension to determine folder
+            file_extension = (
+                safe_filename.split(".")[-1].lower() if "." in safe_filename else "unknown"
+            )
+
             # Map extensions to folders
             folder_mapping = {
                 'jpg': 'images', 'jpeg': 'images', 'png': 'images', 'gif': 'images', 'bmp': 'images', 'webp': 'images',
@@ -275,7 +304,15 @@ class ResourceService:
             folder = folder_mapping.get(file_extension, 'others')
             # Lưu file vào thư mục uploads nội bộ,
             # đồng thời dùng S3 nếu được cấu hình (best-effort).
-            relative_path = os.path.join('uploads', folder, f"{resource_create.version}_{file_upload.filename}")
+            relative_path = os.path.join(
+                "uploads", folder, f"{resource_create.version}_{safe_filename}"
+            )
+            # Guard against any residual traversal after join
+            uploads_root = os.path.abspath(os.path.join(os.getcwd(), "uploads"))
+            local_full_path = os.path.abspath(os.path.join(os.getcwd(), relative_path))
+            if not local_full_path.startswith(uploads_root + os.sep):
+                raise BEErrorCode.USER_NOT_PERMISSION.value
+
             url = f"/{relative_path.replace(os.sep, '/')}"
             user_id = user.id
 
@@ -287,11 +324,8 @@ class ResourceService:
             resource_create_dict['url'] = url
             resource_create_dict['is_deleted'] = False
             
-            # Check if name already exists in database
-            from sqlalchemy.orm import Session
             from app.src.models import Resource
-            
-            # Get database session
+
             db_session = self.base_service.engine_postgresql.get_session()
 
             original_name = resource_create_dict["name"]
@@ -336,13 +370,12 @@ class ResourceService:
 
             # Lưu file vào local storage
             try:
-                local_full_path = os.path.join(os.getcwd(), relative_path)
                 os.makedirs(os.path.dirname(local_full_path), exist_ok=True)
                 with open(local_full_path, "wb") as f:
                     f.write(content)
-    
             except Exception as fs_error:
                 print(f"Local file save failed: {str(fs_error)}")
+                raise
 
             # Upload file lên S3 (nếu cấu hình đúng) - best effort
             print(f"Uploading to S3 (best effort)...")
@@ -381,7 +414,7 @@ class ResourceService:
                 classification_job = enqueue_classification_job(
                     resource_id=str(uploaded_file_metadata.id),
                     user_id=str(user.id),
-                    filename=file_upload.filename or "",
+                    filename=safe_filename,
                     resource_name=str(uploaded_file_metadata.name or ""),
                     fill_keys=fill_keys,
                     tag_id_from_upload=str(tag_id_from_upload) if tag_id_from_upload else None,
@@ -406,7 +439,7 @@ class ResourceService:
                     db_session,
                     user.id,
                     sync_payload,
-                    filename=file_upload.filename or "",
+                    filename=safe_filename,
                     only_fill_empty=True,
                 )
                 for field in ("stage_id", "product_type_id", "platform_id", "status_id", "repo_id"):
@@ -430,6 +463,12 @@ class ResourceService:
         except Exception as e:
             logging.error(f"Lỗi khi tải lên tài nguyên: {str(e)}")
             raise
+        finally:
+            if db_session is not None:
+                try:
+                    db_session.close()
+                except Exception:
+                    pass
 
     def _ensure_required_metadata_defaults(
         self, db_session: Session, payload: Dict, *, user_id: uuid.UUID
@@ -818,9 +857,13 @@ class ResourceService:
             db_session.delete(share)
             db_session.commit()
 
-    def back_up(self, db_session: Session, resource_id: uuid.UUID) -> None:
-        """Define back up resource method."""
+    def back_up(self, db_session: Session, resource_id: uuid.UUID, actor: User) -> None:
+        """Restore soft-deleted resource (owner or admin only)."""
         resource = self.file_repository.get_back_up(db_session, obj_id=resource_id)
         if not resource:
             raise BEErrorCode.RESOURCE_NOT_FOUND.value
+        if not (
+            _is_resource_owner(resource, actor) or _user_has_admin_access(db_session, actor)
+        ):
+            raise BEErrorCode.USER_NOT_PERMISSION.value
         self.file_repository.back_up(db_session, obj_id=resource.id)

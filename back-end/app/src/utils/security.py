@@ -16,15 +16,20 @@ ACCESS_TOKEN_EXPIRE_MINUTES = config("ACCESS_TOKEN_EXPIRE_MINUTES", default=30, 
 REFRESH_TOKEN_EXPIRE_MINUTES = config("REFRESH_TOKEN_EXPIRE_MINUTES", default=60, cast=int)
 
 
-def jwt_create_token(subject: str, public_key: str = "", expires_minutes: int = 0) -> str:
+def jwt_create_token(
+    subject: str,
+    public_key: str = "",
+    expires_minutes: int = 0,
+    token_type: str = "access",
+) -> str:
     """UC-AUTH-01 Bước 5: Tạo JWT (gọi từ AuthService.login)."""
     expire = datetime.utcnow() + timedelta(
-        minutes=expires_minutes if expires_minutes else int(ACCESS_TOKEN_EXPIRE_MINUTES))
+        minutes=expires_minutes if expires_minutes else int(ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
 
+    to_encode: Dict[str, Any] = {"sub": subject, "exp": expire, "type": token_type}
     if public_key:
-        to_encode = {"sub": subject, "exp": expire, "key": public_key}
-    else:
-        to_encode = {"sub": subject, "exp": expire}
+        to_encode["key"] = public_key
     encoded_jwt: str = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 

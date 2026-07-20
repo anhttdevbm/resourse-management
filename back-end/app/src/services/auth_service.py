@@ -1,5 +1,5 @@
 """Define auth service file."""
-from typing import Dict
+from typing import Dict, Optional
 import decouple
 from sqlalchemy.orm import Session
 from app.src.exceptions.error_code import AuthErrorCode
@@ -52,25 +52,53 @@ class AuthService(object):
     @staticmethod
     def login(val_input: str) -> Dict[str, str]:
         """Issue access and refresh JWT tokens."""
-        access_token = jwt_create_token(val_input)
-        refresh_token = jwt_create_token(val_input, expires_minutes=int(REFRESH_TOKEN_EXPIRE_MINUTES))
+        access_token = jwt_create_token(val_input, token_type="access")
+        refresh_token = jwt_create_token(
+            val_input,
+            expires_minutes=int(REFRESH_TOKEN_EXPIRE_MINUTES),
+            token_type="refresh",
+        )
         return {"access_token": access_token, "refresh_token": refresh_token}
 
-    def refresh_access_token(self, val_input: str, refresh_token: str) -> Dict[str, str]:
+    def refresh_access_token(
+        self, db_session: Session, val_input: str, refresh_token: str
+    ) -> Dict[str, str]:
         """Define refresh access token method."""
+        if self.blacklist_token_repository.is_black_token(db_session, refresh_token):
+            raise AuthErrorCode.BLACKLIST_TOKEN.value
         token_data = jwt_decode_token(refresh_token)
+        if token_data.get("type") == "access":
+            raise AuthErrorCode.INVALID_ACCESS_TOKEN.value
         token_payload = TokenPayload(**token_data)
         if token_payload.sub != val_input:
             raise AuthErrorCode.INVALID_ACCESS_TOKEN.value
+        # Rotate: blacklist used refresh token, then issue a new pair
+        self.blacklist_token_repository.create(
+            db_session, obj_in=BlackListTokenCreate(token=refresh_token)
+        )
         return self.login(val_input)
 
-    def logout(self, db_session: Session, token: str) -> None:
-        """Define logout method."""
-        token_data = jwt_decode_token(token)
+    def logout(
+        self,
+        db_session: Session,
+        access_token: str,
+        refresh_token: Optional[str] = None,
+    ) -> None:
+        """Blacklist access token and optional refresh token."""
+        token_data = jwt_decode_token(access_token)
         token_payload = TokenPayload(**token_data)
         if not self.user_repository.get_user_by_email(db_session, token_payload.sub):
             raise AuthErrorCode.INVALID_ACCESS_TOKEN.value
-        self.blacklist_token_repository.create(db_session, obj_in=BlackListTokenCreate(token=token))
+        if not self.blacklist_token_repository.is_black_token(db_session, access_token):
+            self.blacklist_token_repository.create(
+                db_session, obj_in=BlackListTokenCreate(token=access_token)
+            )
+        if refresh_token and not self.blacklist_token_repository.is_black_token(
+            db_session, refresh_token
+        ):
+            self.blacklist_token_repository.create(
+                db_session, obj_in=BlackListTokenCreate(token=refresh_token)
+            )
 
     def handle_forgot_password(self, db_session: Session, email: str):
         user = self.user_repository.get_user_by_email(db_session, email)

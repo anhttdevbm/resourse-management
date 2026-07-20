@@ -103,32 +103,27 @@ const processQueue = (error: any, token: string | null = null) => {
 const refreshToken = async (): Promise<string> => {
     try {
         const storedRefreshToken = cookieStorage.getItem("refreshToken");
-        const storedUser = cookieStorage.getItem("user");
 
-        if (!storedRefreshToken || !storedUser) {
-            throw new Error("Không tìm thấy refresh token hoặc user trong cookie");
+        if (!storedRefreshToken) {
+            throw new Error("Không tìm thấy refresh token");
         }
-
-        const user = JSON.parse(storedUser);
 
         const response = await noAuthAxios.post('/api/auth/user/refresh-token',
             {
                 refresh_token: storedRefreshToken,
-                user: user,
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${storedRefreshToken}`,
-                }
             }
         );
 
         console.log("Phản hồi từ API refresh:", response.data);
 
         const newToken = response.data?.data?.access_token;
+        const newRefresh = response.data?.data?.refresh_token;
 
         if (newToken) {
-            cookieStorage.setItem("accessToken", newToken, { expires: 7 });
+            cookieStorage.setItem("accessToken", newToken);
+            if (newRefresh) {
+                cookieStorage.setItem("refreshToken", newRefresh);
+            }
             setAuthorizationHeader(newToken);
             return newToken;
         }

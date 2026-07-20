@@ -1,128 +1,154 @@
 /**
- * Cookie utility functions
- * Note: httpOnly cookies cannot be set from JavaScript, only from server
- * We'll use secure and sameSite attributes for security
+ * Token storage — sessionStorage (not document.cookie) so tokens are:
+ * - not readable as cookies / not auto-sent on every request
+ * - cleared when the tab/session ends
+ * User profile may still use cookies via cookieStorage for non-secret prefs.
+ */
+
+const TOKEN_KEYS = new Set(["accessToken", "refreshToken"]);
+
+function canUseSessionStorage(): boolean {
+  try {
+    return typeof window !== "undefined" && !!window.sessionStorage;
+  } catch {
+    return false;
+  }
+}
+
+export const tokenStorage = {
+  getItem(key: string): string | null {
+    if (!canUseSessionStorage()) return null;
+    return sessionStorage.getItem(key);
+  },
+
+  setItem(key: string, value: string): void {
+    if (!canUseSessionStorage()) return;
+    sessionStorage.setItem(key, value);
+  },
+
+  removeItem(key: string): void {
+    if (!canUseSessionStorage()) return;
+    sessionStorage.removeItem(key);
+  },
+
+  clearAuthTokens(): void {
+    TOKEN_KEYS.forEach((key) => tokenStorage.removeItem(key));
+  },
+};
+
+/**
+ * Cookie utility for non-secret client preferences (e.g. user profile cache).
+ * Do NOT store access/refresh tokens here — use tokenStorage.
  */
 
 interface CookieOptions {
-    expires?: number; // Days until expiration
-    path?: string;
-    domain?: string;
-    secure?: boolean; // Only send over HTTPS
-    sameSite?: 'strict' | 'lax' | 'none';
+  expires?: number;
+  path?: string;
+  domain?: string;
+  secure?: boolean;
+  sameSite?: "strict" | "lax" | "none";
 }
 
-/**
- * Set a cookie
- */
 export const setCookie = (name: string, value: string, options: CookieOptions = {}): void => {
-    const {
-        expires = 7, // Default 7 days
-        path = '/',
-        domain,
-        secure = window.location.protocol === 'https:', // Auto-detect HTTPS
-        sameSite = 'lax'
-    } = options;
+  const {
+    expires = 7,
+    path = "/",
+    domain,
+    secure = window.location.protocol === "https:",
+    sameSite = "lax",
+  } = options;
 
-    let cookieString = `${encodeURIComponent(name)}=${encodeURIComponent(value)}`;
+  let cookieString = `${encodeURIComponent(name)}=${encodeURIComponent(value)}`;
 
-    if (expires) {
-        const date = new Date();
-        date.setTime(date.getTime() + expires * 24 * 60 * 60 * 1000);
-        cookieString += `; expires=${date.toUTCString()}`;
-    }
+  if (expires) {
+    const date = new Date();
+    date.setTime(date.getTime() + expires * 24 * 60 * 60 * 1000);
+    cookieString += `; expires=${date.toUTCString()}`;
+  }
 
-    cookieString += `; path=${path}`;
+  cookieString += `; path=${path}`;
 
-    if (domain) {
-        cookieString += `; domain=${domain}`;
-    }
+  if (domain) {
+    cookieString += `; domain=${domain}`;
+  }
 
-    if (secure) {
-        cookieString += `; secure`;
-    }
+  if (secure) {
+    cookieString += `; secure`;
+  }
 
-    cookieString += `; sameSite=${sameSite}`;
+  cookieString += `; sameSite=${sameSite}`;
 
-    document.cookie = cookieString;
+  document.cookie = cookieString;
 };
 
-/**
- * Get a cookie value
- */
 export const getCookie = (name: string): string | null => {
-    const nameEQ = encodeURIComponent(name) + '=';
-    const cookies = document.cookie.split(';');
+  const nameEQ = encodeURIComponent(name) + "=";
+  const cookies = document.cookie.split(";");
 
-    for (let i = 0; i < cookies.length; i++) {
-        let cookie = cookies[i];
-        while (cookie.charAt(0) === ' ') {
-            cookie = cookie.substring(1, cookie.length);
-        }
-        if (cookie.indexOf(nameEQ) === 0) {
-            return decodeURIComponent(cookie.substring(nameEQ.length, cookie.length));
-        }
+  for (let i = 0; i < cookies.length; i++) {
+    let cookie = cookies[i];
+    while (cookie.charAt(0) === " ") {
+      cookie = cookie.substring(1, cookie.length);
     }
+    if (cookie.indexOf(nameEQ) === 0) {
+      return decodeURIComponent(cookie.substring(nameEQ.length, cookie.length));
+    }
+  }
 
-    return null;
+  return null;
+};
+
+export const removeCookie = (
+  name: string,
+  options: { path?: string; domain?: string } = {}
+): void => {
+  const { path = "/", domain } = options;
+  let cookieString = `${encodeURIComponent(name)}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}`;
+  if (domain) {
+    cookieString += `; domain=${domain}`;
+  }
+  document.cookie = cookieString;
 };
 
 /**
- * Remove a cookie
- */
-export const removeCookie = (name: string, options: { path?: string; domain?: string } = {}): void => {
-    const { path = '/', domain } = options;
-    
-    // Set expiration date in the past
-    let cookieString = `${encodeURIComponent(name)}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}`;
-    
-    if (domain) {
-        cookieString += `; domain=${domain}`;
-    }
-
-    document.cookie = cookieString;
-};
-
-/**
- * Check if cookies are enabled
- */
-export const areCookiesEnabled = (): boolean => {
-    try {
-        setCookie('__test_cookie__', 'test');
-        const enabled = getCookie('__test_cookie__') === 'test';
-        removeCookie('__test_cookie__');
-        return enabled;
-    } catch (e) {
-        return false;
-    }
-};
-
-/**
- * Storage wrapper for cookies (to replace localStorage API)
+ * Storage wrapper: tokens → sessionStorage; other keys → cookies.
  */
 export const cookieStorage = {
-    getItem: (key: string): string | null => {
-        return getCookie(key);
-    },
-
-    setItem: (key: string, value: string, options?: CookieOptions): void => {
-        setCookie(key, value, options);
-    },
-
-    removeItem: (key: string): void => {
-        removeCookie(key);
-    },
-
-    clear: (): void => {
-        // Get all cookies and remove them
-        const cookies = document.cookie.split(';');
-        cookies.forEach(cookie => {
-            const eqPos = cookie.indexOf('=');
-            const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-            if (name) {
-                removeCookie(name);
-            }
-        });
+  getItem(key: string): string | null {
+    if (TOKEN_KEYS.has(key)) {
+      return tokenStorage.getItem(key);
     }
-};
+    return getCookie(key);
+  },
 
+  setItem(key: string, value: string, _options?: CookieOptions): void {
+    if (TOKEN_KEYS.has(key)) {
+      tokenStorage.setItem(key, value);
+      // Migrate away from legacy document.cookie tokens
+      removeCookie(key);
+      return;
+    }
+    setCookie(key, value, _options);
+  },
+
+  removeItem(key: string): void {
+    if (TOKEN_KEYS.has(key)) {
+      tokenStorage.removeItem(key);
+      removeCookie(key);
+      return;
+    }
+    removeCookie(key);
+  },
+
+  clear(): void {
+    tokenStorage.clearAuthTokens();
+    const cookies = document.cookie.split(";");
+    cookies.forEach((cookie) => {
+      const eqPos = cookie.indexOf("=");
+      const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+      if (name) {
+        removeCookie(name);
+      }
+    });
+  },
+};

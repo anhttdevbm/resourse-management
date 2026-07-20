@@ -56,9 +56,7 @@ export const CategoryCatalogService = {
   },
 
   async deleteStage(id: string): Promise<boolean> {
-    const res = await apiCall.delete<ApiEnvelope<unknown>>(`${PREFIX}/resource_stages/`, {
-      params: { resource_stage_id: id },
-    });
+    const res = await apiCall.delete<ApiEnvelope<unknown>>(`${PREFIX}/resource_stages/${id}`);
     return res.data?.code === 'BE0000';
   },
 
@@ -75,9 +73,7 @@ export const CategoryCatalogService = {
   },
 
   async deleteProductType(id: string): Promise<boolean> {
-    const res = await apiCall.delete<ApiEnvelope<unknown>>(`${PREFIX}/produce_types/`, {
-      params: { produce_type_id: id },
-    });
+    const res = await apiCall.delete<ApiEnvelope<unknown>>(`${PREFIX}/produce_types/${id}`);
     return res.data?.code === 'BE0000';
   },
 
@@ -96,9 +92,7 @@ export const CategoryCatalogService = {
   },
 
   async deletePlatform(id: string): Promise<boolean> {
-    const res = await apiCall.delete<ApiEnvelope<unknown>>(`${PREFIX}/resource_platforms/`, {
-      params: { resource_platform_id: id },
-    });
+    const res = await apiCall.delete<ApiEnvelope<unknown>>(`${PREFIX}/resource_platforms/${id}`);
     return res.data?.code === 'BE0000';
   },
 };

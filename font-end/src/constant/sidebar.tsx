@@ -24,7 +24,7 @@ export const sidebarItem = [
                 label: 'Quản lý tài nguyên',
                 links: [
                     {title:'Danh sách tài nguyên', to: '/resources'},
-                    {title:'Thêm tài nguyên mới', to: '/resources/add'},
+                    {title:'Thêm tài nguyên mới', to: '/resources/upload'},
                     {title:'Phân loại tài nguyên', to: '/resources/categories'}
                 ]
             },

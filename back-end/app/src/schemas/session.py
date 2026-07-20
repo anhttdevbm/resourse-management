@@ -15,3 +15,9 @@ class RefreshToken(BaseModel):
     """Schema define refresh access token input data."""
 
     refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    """Optional refresh token to blacklist on logout."""
+
+    refresh_token: Optional[str] = None

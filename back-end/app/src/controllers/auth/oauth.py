@@ -31,6 +31,19 @@ def generate_code_challenge(verifier: str) -> str:
     return base64.urlsafe_b64encode(sha256).rstrip(b"=").decode("utf-8")
 
 
+def oauth_redirect_with_tokens(frontend_url: str, token_data: dict, login_type: str) -> RedirectResponse:
+    """Put JWTs in URL hash fragment so they are not sent to servers/proxies/logs."""
+    from urllib.parse import quote
+
+    access = quote(token_data["access_token"], safe="")
+    refresh = quote(token_data.get("refresh_token", ""), safe="")
+    redirect_url = (
+        f"{frontend_url}#access_token={access}"
+        f"&refresh_token={refresh}&login_type={login_type}"
+    )
+    return RedirectResponse(url=redirect_url, status_code=302)
+
+
 @auth_routers.get("/facebook/callback")
 async def facebook_callback(request: Request):
     error = request.query_params.get("error") or request.query_params.get("error_message")
@@ -57,13 +70,8 @@ async def facebook_callback(request: Request):
         return redirect_account_locked()
 
     token_data = auth_service.login(user.email)
+    return oauth_redirect_with_tokens(oauth_redirect_target(request), token_data, "facebook")
 
-    frontend_url = oauth_redirect_target(request)
-    redirect_url = (
-        f"{frontend_url}?access_token={token_data['access_token']}"
-        f"&refresh_token={token_data.get('refresh_token', '')}&login_type=facebook"
-    )
-    return RedirectResponse(url=redirect_url)
 
 
 @auth_routers.get("/login/facebook")
@@ -126,13 +134,8 @@ async def twitter_callback(request: Request):
             return redirect_account_locked()
 
         token_data = auth_service.login(user.email)
+        return oauth_redirect_with_tokens(oauth_redirect_target(request), token_data, "twitter")
 
-        frontend_url = oauth_redirect_target(request)
-        redirect_url = (
-            f"{frontend_url}?access_token={token_data['access_token']}"
-            f"&refresh_token={token_data.get('refresh_token', '')}&login_type=twitter"
-        )
-        return RedirectResponse(url=redirect_url, status_code=302)
 
     except Exception as e:
         print(f"Twitter callback error: {str(e)}")
@@ -177,13 +180,8 @@ async def google_callback(request: Request):
             return redirect_account_locked()
 
         token_data = auth_service.login(user.email)
+        return oauth_redirect_with_tokens(oauth_redirect_target(request), token_data, "google")
 
-        frontend_url = oauth_redirect_target(request)
-        redirect_url = (
-            f"{frontend_url}?access_token={token_data['access_token']}"
-            f"&refresh_token={token_data.get('refresh_token', '')}&login_type=google"
-        )
-        return RedirectResponse(url=redirect_url)
     except Exception as e:
         frontend_url = f"{public_url()}/login"
         redirect_url = f"{frontend_url}?error=google_login_failed&message={str(e)}"
@@ -219,15 +217,7 @@ async def github_callback(request: Request, db: Session = Depends(get_db)):
             return redirect_account_locked()
 
         token_data = auth_service.login(user.email)
-
-        frontend_url = oauth_redirect_target(request)
-        redirect_url = (
-            f"{frontend_url}?access_token={token_data['access_token']}"
-            f"&refresh_token={token_data.get('refresh_token', '')}&login_type=github"
-        )
-        print(f"Redirecting to: {redirect_url}")
-
-        return RedirectResponse(url=redirect_url, status_code=302)
+        return oauth_redirect_with_tokens(oauth_redirect_target(request), token_data, "github")
 
     except Exception as e:
         print(f"GitHub callback error: {str(e)}")

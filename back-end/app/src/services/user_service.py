@@ -74,16 +74,19 @@ class UserService(object):
         if user and getattr(user, "is_locked", False):
             raise AuthErrorCode.ACCOUNT_LOCKED.value
 
-    def get_user_by_access_token(self, db_session: Session, token: str) -> Union[models.User]:
+    def get_user_by_access_token(self, db_session: Session, token: str) -> models.User:
         """Define get user system by access token."""
         if self.blacklist_token_repository.is_black_token(db_session, token):
             raise AuthErrorCode.BLACKLIST_TOKEN.value
         payload = jwt_decode_token(token)
+        if payload.get("type") == "refresh":
+            raise AuthErrorCode.INVALID_ACCESS_TOKEN.value
         token_data = TokenPayload(**payload)
         user = self.user_repository.get_user_by_email(db_session, token_data.sub)
-        if user:
-            self._ensure_user_not_locked(user)
-            return user
+        if not user:
+            raise AuthErrorCode.INVALID_ACCESS_TOKEN.value
+        self._ensure_user_not_locked(user)
+        return user
 
     def get_current_user(
             self,
